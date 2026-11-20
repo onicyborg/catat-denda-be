@@ -32,13 +32,25 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
       'User' | 'ViolationType' | 'Employee' | 'FineCase' | 'FineCaseMember',
     id: string,
   ) {
-    const quote = (identifier: string) =>
-      '"' + identifier.replaceAll('"', '""') + '"';
-    // Raw SQL must use the same schema as the adapter's generated queries.
-    const relation = Prisma.raw(`${quote(this.schema)}.${quote(table)}`);
+    const relation = this.relation(table);
     await tx.$queryRaw(
       Prisma.sql`SELECT id FROM ${relation} WHERE id = ${id}::uuid FOR UPDATE`,
     );
+  }
+
+  relation(
+    table:
+      | 'User'
+      | 'ViolationType'
+      | 'Employee'
+      | 'FineCase'
+      | 'FineCaseMember'
+      | 'PaymentEntry'
+      | 'AuditLog'
+      | 'AppSettings',
+  ) {
+    const quote = (value: string) => '"' + value.replaceAll('"', '""') + '"';
+    return Prisma.raw(`${quote(this.schema)}.${quote(table)}`);
   }
 
   async onModuleDestroy() {

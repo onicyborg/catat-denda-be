@@ -27,6 +27,8 @@ export function validateEnv(config: Record<string, unknown>) {
       NODE_ENV: z
         .enum(['development', 'test', 'production'])
         .default('development'),
+      CSV_MAX_DAYS: z.coerce.number().int().min(1).max(3660).default(366),
+      CSV_MAX_ROWS: z.coerce.number().int().min(1).max(50000).default(10000),
       SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
       SESSION_SECRET: z.string().min(32),
     })

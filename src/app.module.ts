@@ -1,3 +1,4 @@
+import { ReportingModule } from './reporting/module.js';
 import { PaymentsModule } from './payments/module.js';
 import { Module, Controller, Get } from '@nestjs/common';
 import { FinesModule } from './fines/module.js';
@@ -31,6 +32,7 @@ class HealthController {
     MasterModule,
     FinesModule,
     PaymentsModule,
+    ReportingModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
   ],
   controllers: [AuthController, HealthController],

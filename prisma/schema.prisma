@@ -175,9 +175,11 @@ model AuditLog {
 
   @@index([entityType, entityId, createdAt(sort: Desc)])
   @@index([createdAt(sort: Desc)])
+  @@index([actorUserId, createdAt(sort: Desc)])
 }
 
 model AppSettings {
+  version             Int      @default(1)
   id                  Int      @id @default(1)
   businessName        String   @db.VarChar(150)
   currency            String   @default("IDR")

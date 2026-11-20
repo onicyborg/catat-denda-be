@@ -1,5 +1,6 @@
 import {
   Catch,
+  StreamableFile,
   HttpException,
   ValidationPipe,
   UnprocessableEntityException,
@@ -94,6 +95,12 @@ export function configure(app: INestApplication) {
     intercept: (_context, next) =>
       next
         .handle()
-        .pipe(map((data) => (data instanceof PageResult ? data : { data }))),
+        .pipe(
+          map((data) =>
+            data instanceof PageResult || data instanceof StreamableFile
+              ? data
+              : { data },
+          ),
+        ),
   });
 }
