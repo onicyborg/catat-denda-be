@@ -31,6 +31,7 @@
     "prisma:deploy": "prisma migrate deploy",
     "db:seed": "prisma db seed",
     "test:seed": "pnpm build && tsx scripts/verify-initial-seed.ts",
+    "test:uuid": "pnpm test:seed && node scripts/verify-uuid-migration.mjs",
     "test:browser:server": "pnpm build && node scripts/serve-browser-qa.mjs",
     "test:performance": "pnpm build && node scripts/verify-performance.mjs",
     "test:recovery": "pnpm build && node scripts/verify-restore.mjs",
@@ -55,6 +56,7 @@
     "pg": "^8.23.1",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
+    "uuid": "14.0.3",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -80,6 +82,8 @@
     "vitest": "^4.1.2"
   },
   "pnpm": {
-    "overrides": { "@prisma/config>effect": "3.22.1" }
+    "overrides": {
+      "@prisma/config>effect": "3.22.1"
+    }
   }
 }

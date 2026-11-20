@@ -20,7 +20,7 @@ const fallback = {
 export class SettingsService {
   constructor(private db: PrismaService) {}
   async read(tx: Prisma.TransactionClient = this.db) {
-    const row = await tx.appSettings.findUnique({ where: { id: 1 } });
+    const row = await tx.appSettings.findUnique({ where: { singletonKey: 1 } });
     return row
       ? {
           businessName: row.businessName,
@@ -36,6 +36,7 @@ export class SettingsService {
   audit(
     tx: Prisma.TransactionClient,
     actor: Actor,
+    entityId: string,
     before: Prisma.InputJsonValue,
     after: Prisma.InputJsonValue,
   ) {
@@ -45,7 +46,7 @@ export class SettingsService {
         requestId: actor.requestId,
         action: 'SETTINGS_UPDATE',
         entityType: 'AppSettings',
-        entityId: '00000000-0000-4000-8000-000000000001',
+        entityId,
         beforeJson: before,
         afterJson: after,
       },
@@ -75,9 +76,9 @@ export class SettingsService {
             : body.finePolicyReference || null,
         updatedBy: actor.userId,
       };
-      await tx.appSettings.upsert({
-        where: { id: 1 },
-        create: { id: 1, ...data, version: 1 },
+      const settings = await tx.appSettings.upsert({
+        where: { singletonKey: 1 },
+        create: { ...data, version: 1 },
         update: { ...data, version: { increment: 1 } },
       });
       const after = await this.read(tx);
@@ -88,7 +89,13 @@ export class SettingsService {
         timezone: value.timezone,
         version: value.version,
       });
-      await this.audit(tx, actor, snapshot(before), snapshot(after));
+      await this.audit(
+        tx,
+        actor,
+        settings.id,
+        snapshot(before),
+        snapshot(after),
+      );
       return after;
     });
   }

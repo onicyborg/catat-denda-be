@@ -119,3 +119,7 @@ Hasil checks serta batas validasi lokal tersedia di [ops/QA.md](ops/QA.md). Guna
 Setelah `pnpm prisma:generate` dan `pnpm prisma:deploy`, jalankan `pnpm db:seed` memakai DATABASE_URL owner/provisioning. Untuk database baru, supply SEED_ADMIN_PASSWORD melalui environment privat; username defyana dibuat sebagai ADMIN. Password tidak disimpan di source/Git dan akun yang sudah ada tidak direset. Job administrasi memerlukan dependencies tooling penuh, bukan instalasi runtime --prod.
 
 Seeder memuat11 karyawan dan18 kejadian sumber sebagai DRAFT dengan23 alokasi, total nominal diketahui105000,3 nominal null dan0 pembayaran. Semua tanggal dan jenis tetap kosong sampai admin meninjau lalu posting. Batch idempotent: aman dijalankan ulang tanpa menggandakan atau menimpa data yang sudah ditinjau. `pnpm test:seed` membangun API dan menguji seed pada schema disposable. Detail deployment, pembagian nominal, audit dan bukti tes tersedia di [ops/INITIAL-SEED.md](ops/INITIAL-SEED.md).
+
+## UUIDv7
+
+Seluruh primary key entitas menggunakan UUIDv7, termasuk AppSettings dan FineCaseCreation. Singleton settings memakai singletonKey1; caseNumber tetap nomor bisnis. Seeder menggunakan marker batch teks untuk idempotensi dan membiarkan Prisma menghasilkan IDv7 baru. Request ID dan entity audit export juga UUIDv7. `pnpm test:uuid` memeriksa generated IDs, API/ledger, idempotensi seed dan upgrade schema lama. Detail reset lokal yang diminta dan bukti verifikasi di [ops/UUID-V7.md](ops/UUID-V7.md).

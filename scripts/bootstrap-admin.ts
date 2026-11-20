@@ -53,7 +53,7 @@ try {
       },
     });
     await tx.appSettings.upsert({
-      where: { id: 1 },
+      where: { singletonKey: 1 },
       create: { businessName: 'Catat Denda', updatedBy: user.id },
       update: {},
     });

@@ -40,7 +40,7 @@ Semua kejadian DRAFT karena tanggal dan jenis belum diberikan. Source text disim
 
 ## Eksekusi ulang dan audit
 
-Satu transaksi meliputi admin/settings/master/case/creation marker/audit; error membatalkan semuanya. Advisory lock menserialkan seed concurrent serta berbagi namespace identitas dengan API. UUID deterministik v5 dan marker batch `catat-denda:initial-2026:v1` menandai18 kejadian secara permanen. Manifest di-hash; perubahan source batch yang telah diterapkan ditolak dan memerlukan batch baru/review eksplisit.
+Satu transaksi meliputi admin/settings/master/case/creation marker/audit; error membatalkan semuanya. Advisory lock menserialkan seed concurrent serta berbagi namespace identitas dengan API. Seluruh ID row dibuat sebagai UUIDv7 melalui default Prisma, termasuk ID pengaturan dan creation marker. `FineCaseCreation.seedKey` berupa kunci batch teks stabil `catat-denda:initial-2026:v1:incident:N`, sehingga idempotensi tidak bergantung ID deterministik. Manifest di-hash; perubahan source batch yang telah diterapkan ditolak dan memerlukan batch baru/review eksplisit. `pnpm test:uuid` memeriksa seluruh ID tabel aplikasi, request/audit ID, alur pembayaran/reversal dan migrasi dari struktur lama.
 
 Seed yang diulang tidak membuat kasus/karyawan baru untuk batch lengkap, mengembalikan casesCreated0/casesSkipped18 dan mempertahankan password, nama/profil yang sudah diedit, draft yang sudah ditinjau/posted, serta pengaturan usaha. Seed bukan alat reset atau rekonsiliasi ulang data operasional. Jangan menghapus marker atau mengedit batch v1 setelah diterapkan. Case number berasal dari sequence DB, tidak dipaksa menimpa nomor yang sudah ada; transaksi gagal dapat meninggalkan gap sequence yang normal pada PostgreSQL.
 

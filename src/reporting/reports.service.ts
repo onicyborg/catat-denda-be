@@ -5,7 +5,7 @@ import {
   UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomUUID } from 'node:crypto';
+import { v7 as uuidv7 } from 'uuid';
 import { Prisma } from '../generated/prisma/client.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PageResult } from '../pagination.js';
@@ -246,7 +246,7 @@ export class ReportsService {
         requestId: actor.requestId,
         action,
         entityType: 'ReportExport',
-        entityId: randomUUID(),
+        entityId: uuidv7(),
         afterJson: { filters, rowCount, format: 'CSV' },
       },
     });

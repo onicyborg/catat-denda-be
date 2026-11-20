@@ -38,7 +38,7 @@ enum Method {
 }
 
 model User {
-  id           String        @id @default(uuid()) @db.Uuid
+  id           String        @id @default(uuid(7)) @db.Uuid
   email        String?       @unique @db.VarChar(254)
   username     String?       @unique @db.VarChar(40)
   passwordHash String
@@ -51,7 +51,7 @@ model User {
 }
 
 model AuthSession {
-  id         String    @id @default(uuid()) @db.Uuid
+  id         String    @id @default(uuid(7)) @db.Uuid
   userId     String    @db.Uuid
   user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
   tokenHash  String    @unique
@@ -62,7 +62,7 @@ model AuthSession {
 }
 
 model Employee {
-  id             String           @id @default(uuid()) @db.Uuid
+  id             String           @id @default(uuid(7)) @db.Uuid
   employeeCode   String?          @unique @db.VarChar(40)
   displayName    String           @db.VarChar(120)
   normalizedName String           @db.VarChar(120)
@@ -75,7 +75,7 @@ model Employee {
 }
 
 model EmployeeAlias {
-  id              String   @id @default(uuid()) @db.Uuid
+  id              String   @id @default(uuid(7)) @db.Uuid
   employeeId      String   @db.Uuid
   employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   aliasDisplay    String   @db.VarChar(120)
@@ -83,7 +83,7 @@ model EmployeeAlias {
 }
 
 model ViolationType {
-  id                     String     @id @default(uuid()) @db.Uuid
+  id                     String     @id @default(uuid(7)) @db.Uuid
   code                   String     @unique @db.VarChar(40)
   name                   String     @db.VarChar(120)
   category               Category
@@ -97,7 +97,7 @@ model ViolationType {
 
 model FineCase {
   creation                  FineCaseCreation?
-  id                        String            @id @default(uuid()) @db.Uuid
+  id                        String            @id @default(uuid(7)) @db.Uuid
   caseNumber                Int               @unique @default(autoincrement())
   occurredAt                DateTime?         @db.Timestamptz
   violationTypeId           String?           @db.Uuid
@@ -125,7 +125,7 @@ model FineCase {
 }
 
 model FineCaseMember {
-  id                   String         @id @default(uuid()) @db.Uuid
+  id                   String         @id @default(uuid(7)) @db.Uuid
   fineCaseId           String         @db.Uuid
   fineCase             FineCase       @relation(fields: [fineCaseId], references: [id], onDelete: Restrict)
   employeeId           String?        @db.Uuid
@@ -142,7 +142,7 @@ model FineCaseMember {
 }
 
 model PaymentEntry {
-  id                String         @id @default(uuid()) @db.Uuid
+  id                String         @id @default(uuid(7)) @db.Uuid
   fineCaseMemberId  String         @db.Uuid
   member            FineCaseMember @relation(fields: [fineCaseMemberId], references: [id], onDelete: Restrict)
   kind              EntryKind
@@ -163,7 +163,7 @@ model PaymentEntry {
 }
 
 model AuditLog {
-  id          String   @id @default(uuid()) @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
   actorUserId String   @db.Uuid
   action      String
   entityType  String
@@ -180,7 +180,8 @@ model AuditLog {
 
 model AppSettings {
   version             Int      @default(1)
-  id                  Int      @id @default(1)
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  singletonKey        Int      @unique @default(1)
   businessName        String   @db.VarChar(150)
   currency            String   @default("IDR")
   timezone            String   @default("Asia/Jakarta")
@@ -190,7 +191,9 @@ model AppSettings {
 }
 
 model FineCaseCreation {
-  key         String   @id @db.Uuid
+  id          String   @id @default(uuid(7)) @db.Uuid
+  key         String   @unique @default(uuid(7)) @db.Uuid
+  seedKey     String?  @unique @db.VarChar(96)
   actorUserId String   @db.Uuid
   fineCaseId  String   @unique @db.Uuid
   fineCase    FineCase @relation(fields: [fineCaseId], references: [id], onDelete: Restrict)

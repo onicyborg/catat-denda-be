@@ -4,9 +4,10 @@ import { randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
-import { seedInitialData, seedId } from '../prisma/seed-initial.js';
+import { seedInitialData, seedKey } from '../prisma/seed-initial.js';
 import { initialIncidents } from '../prisma/initial-data.js';
 import * as argon2 from 'argon2';
+import { version as uuidVersion } from 'uuid';
 
 const schema = 'qa_seed_' + randomBytes(6).toString('hex');
 const url = new URL(process.env.DATABASE_URL!);
@@ -73,9 +74,14 @@ try {
   });
   assert(await argon2.verify(admin.passwordHash, password));
   assert(admin.passwordHash.startsWith('$argon2id$'));
-  const cases = await db.fineCase.findMany({ include: { members: true } });
+  const cases = await db.fineCase.findMany({
+    include: { members: true, creation: true },
+  });
+  const employeeIds = new Map(
+    (await db.employee.findMany()).map((e) => [e.normalizedName, e.id]),
+  );
   for (const [index, incident] of initialIncidents.entries()) {
-    const row = cases.find((c) => c.id === seedId('case:' + (index + 1)))!;
+    const row = cases.find((c) => c.creation?.seedKey === seedKey(index))!;
     assert.equal(row.sourceText, incident.sourceText);
     assert.equal(row.description, incident.description);
     assert.equal(row.members.length, incident.employees.length);
@@ -85,28 +91,29 @@ try {
     );
   }
   assert.equal(
-    cases.find((c) => c.id === seedId('case:11'))!.members[0].assignedAmount,
+    cases.find((c) => c.creation?.seedKey === seedKey(10))!.members[0]
+      .assignedAmount,
     5000,
   );
   assert(
     cases
-      .find((c) => c.id === seedId('case:11'))!
+      .find((c) => c.creation?.seedKey === seedKey(10))!
       .description!.includes('2000'),
   );
-  assert.notEqual(seedId('employee:el'), seedId('employee:elvina'));
-  assert.notEqual(seedId('employee:davin'), seedId('employee:dhafin'));
-  const edited = seedId('case:1');
+  assert.notEqual(employeeIds.get('el'), employeeIds.get('elvina'));
+  assert.notEqual(employeeIds.get('davin'), employeeIds.get('dhafin'));
+  const edited = cases.find((c) => c.creation?.seedKey === seedKey(0))!.id;
   await db.fineCase.update({
     where: { id: edited },
     data: { description: 'Edited by administrator', version: { increment: 1 } },
   });
   await db.appSettings.update({
-    where: { id: 1 },
+    where: { singletonKey: 1 },
     data: { businessName: 'Existing business', version: { increment: 1 } },
   });
   const audits = await db.auditLog.count();
   await db.employee.update({
-    where: { id: seedId('employee:fauzi') },
+    where: { id: employeeIds.get('fauzi')! },
     data: { displayName: 'Fauzi revised', normalizedName: 'fauzi revised' },
   });
   const again = await seedInitialData(db, randomBytes(20).toString('hex'));
@@ -123,7 +130,8 @@ try {
     'Edited by administrator',
   );
   assert.equal(
-    (await db.appSettings.findUniqueOrThrow({ where: { id: 1 } })).businessName,
+    (await db.appSettings.findUniqueOrThrow({ where: { singletonKey: 1 } }))
+      .businessName,
     'Existing business',
   );
   execFileSync('pnpm', ['db:seed'], {
@@ -131,7 +139,7 @@ try {
     stdio: 'pipe',
   });
   assert.equal(await db.auditLog.count(), audits);
-  // The API must be able to read/edit deterministic UUIDs and show drafts without a date.
+  // The API must be able to read/edit UUIDv7 IDs and show drafts without a date.
   process.env.NODE_ENV = 'test';
   process.env.APP_BASE_URL = 'http://localhost:3000';
   process.env.SESSION_SECRET = randomBytes(32).toString('hex');
@@ -139,16 +147,59 @@ try {
     env: { ...process.env, QA_ADMIN_PASSWORD: password, QA_FINE_ID: edited },
     stdio: 'pipe',
   });
+  for (const model of [
+    'user',
+    'authSession',
+    'employee',
+    'employeeAlias',
+    'violationType',
+    'fineCase',
+    'fineCaseMember',
+    'paymentEntry',
+    'auditLog',
+    'appSettings',
+    'fineCaseCreation',
+  ] as const) {
+    const records = await (
+      db[model].findMany as unknown as (args: {
+        select: { id: true };
+      }) => Promise<{ id: string }[]>
+    )({ select: { id: true } });
+    assert(records.length > 0, model + ' must be exercised');
+    for (const row of records) assert.equal(uuidVersion(row.id), 7, model);
+  }
+  const settings = await db.appSettings.findUniqueOrThrow({
+    where: { singletonKey: 1 },
+  });
+  await assert.rejects(
+    db.appSettings.create({
+      data: { businessName: 'Duplicate', updatedBy: admin.id },
+    }),
+  );
+  for (const audit of await db.auditLog.findMany({
+    select: { entityId: true, requestId: true },
+  })) {
+    assert.equal(uuidVersion(audit.entityId), 7);
+    if (audit.requestId) assert.equal(uuidVersion(audit.requestId), 7);
+  }
+  assert.equal(
+    (
+      await db.auditLog.findFirstOrThrow({
+        where: { entityType: 'AppSettings' },
+      })
+    ).entityId,
+    settings.id,
+  );
   assert.equal(
     (
       await db.employee.findUniqueOrThrow({
-        where: { id: seedId('employee:fauzi') },
+        where: { id: employeeIds.get('fauzi')! },
       })
     ).displayName,
     'Fauzi revised',
   );
   const marker = await db.fineCaseCreation.findUniqueOrThrow({
-    where: { key: seedId('creation:1') },
+    where: { seedKey: seedKey(0) },
   });
   await db.fineCaseCreation.update({
     where: { key: marker.key },

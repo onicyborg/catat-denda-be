@@ -8,7 +8,7 @@ import {
   type ExceptionFilter,
   type INestApplication,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { v7 as uuidv7 } from 'uuid';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { Request, Response, NextFunction } from 'express';
@@ -70,7 +70,7 @@ export function configure(app: INestApplication) {
       res: Response,
       next: NextFunction,
     ) => {
-      req.requestId = randomUUID();
+      req.requestId = uuidv7();
       const started = process.hrtime.bigint();
       res.setHeader('X-Request-Id', req.requestId);
       res.setHeader('Cache-Control', 'no-store');

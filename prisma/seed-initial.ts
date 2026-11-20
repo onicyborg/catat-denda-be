@@ -6,17 +6,7 @@ import { initialEmployees, initialIncidents } from './initial-data.js';
 const batch = 'catat-denda:initial-2026:v1';
 const normalize = (name: string) =>
   name.normalize('NFC').trim().replace(/\s+/g, ' ').toLowerCase();
-export function seedId(key: string) {
-  const bytes = createHash('sha1')
-    .update(Buffer.from('6ba7b8119dad11d180b400c04fd430c8', 'hex'))
-    .update(batch + ':' + key)
-    .digest()
-    .subarray(0, 16);
-  bytes[6] = (bytes[6] & 0x0f) | 0x50;
-  bytes[8] = (bytes[8] & 0x3f) | 0x80;
-  const hex = bytes.toString('hex');
-  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
-}
+export const seedKey = (index: number) => `${batch}:incident:${index + 1}`;
 
 export async function seedInitialData(db: PrismaClient, password?: string) {
   return db.$transaction(
@@ -68,11 +58,11 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
             afterJson,
           },
         });
-      if (!(await tx.appSettings.findUnique({ where: { id: 1 } }))) {
-        await tx.appSettings.create({
+      if (!(await tx.appSettings.findUnique({ where: { singletonKey: 1 } }))) {
+        const settings = await tx.appSettings.create({
           data: { businessName: 'Catat Denda', updatedBy: actor },
         });
-        await audit('AppSettings', '00000000-0000-4000-8000-000000000001', {
+        await audit('AppSettings', settings.id, {
           batch,
           businessName: 'Catat Denda',
         });
@@ -80,22 +70,19 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
       const identities = new Map<string, string>();
       const markers = await tx.fineCaseCreation.findMany({
         where: {
-          key: {
-            in: initialIncidents.map((_, i) => seedId('creation:' + (i + 1))),
+          seedKey: {
+            in: initialIncidents.map((_, i) => seedKey(i)),
           },
         },
       });
       for (const marker of markers) {
         const index = initialIncidents.findIndex(
-          (_, i) => seedId('creation:' + (i + 1)) === marker.key,
+          (_, i) => seedKey(i) === marker.seedKey,
         );
         const requestHash = createHash('sha256')
           .update(JSON.stringify({ batch, incident: initialIncidents[index] }))
           .digest('hex');
-        if (
-          marker.fineCaseId !== seedId('case:' + (index + 1)) ||
-          marker.requestHash !== requestHash
-        )
+        if (marker.requestHash !== requestHash)
           throw new Error(
             'Manifest seed berbeda dari batch yang sudah diterapkan.',
           );
@@ -130,7 +117,6 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
         if (!employee) {
           employee = await tx.employee.create({
             data: {
-              id: seedId('employee:' + normalizedName),
               displayName: name,
               normalizedName,
             },
@@ -142,27 +128,22 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
       }
       let casesCreated = 0;
       for (const [index, incident] of initialIncidents.entries()) {
-        const key = seedId('creation:' + (index + 1));
-        const id = seedId('case:' + (index + 1));
+        const key = seedKey(index);
         const requestHash = createHash('sha256')
           .update(JSON.stringify({ batch, incident }))
           .digest('hex');
         const existing = await tx.fineCaseCreation.findUnique({
-          where: { key },
+          where: { seedKey: key },
         });
         if (existing) {
-          if (
-            existing.fineCaseId !== id ||
-            existing.requestHash !== requestHash
-          )
+          if (existing.requestHash !== requestHash)
             throw new Error(
               'Manifest seed berbeda dari batch yang sudah diterapkan. Buat batch baru dengan review eksplisit.',
             );
           continue;
         }
-        await tx.fineCase.create({
+        const fine = await tx.fineCase.create({
           data: {
-            id,
             description: incident.description,
             sourceText: incident.sourceText,
             occurredAt: null,
@@ -170,8 +151,7 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
             status: 'DRAFT',
             createdBy: actor,
             members: {
-              create: incident.employees.map((name, memberIndex) => ({
-                id: seedId(`member:${index + 1}:${memberIndex}`),
+              create: incident.employees.map((name) => ({
                 employeeId: identities.get(name)!,
                 rawEmployeeName: name,
                 assignedAmount:
@@ -180,10 +160,12 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
                     : incident.total / incident.employees.length,
               })),
             },
-            creation: { create: { key, actorUserId: actor, requestHash } },
+            creation: {
+              create: { seedKey: key, actorUserId: actor, requestHash },
+            },
           },
         });
-        await audit('FineCase', id, {
+        await audit('FineCase', fine.id, {
           batch,
           status: 'DRAFT',
           sourceText: incident.sourceText,
