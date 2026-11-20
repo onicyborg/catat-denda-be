@@ -39,6 +39,7 @@ cleanup() {
 }
 trap cleanup EXIT
 pull_image() {
+  if docker image inspect "$1" > /dev/null 2>&1; then return 0; fi
   for attempt in 1 2 3; do
     if timeout --signal=TERM --kill-after=15s 180s docker pull "$1"; then return 0; fi
     echo "Image download attempt $attempt failed or timed out; retrying." >&2
@@ -74,7 +75,7 @@ mv .env.runtime.next .env.runtime
 activated=true
 IMAGE="$image" docker compose -f docker-compose.yml up -d --wait --wait-timeout 120
 systemctl reload nginx
-curl --fail --silent --show-error --max-time 15 \
+curl --fail --silent --show-error --retry 5 --retry-all-errors --retry-delay 1 --max-time 15 \
   -H "Host: $domain" http://127.0.0.1:8080/api/v1/health/live > /dev/null
 printf '%s\n' "$image" > .image
 printf '%s\n' "$admin_image" > .admin-image

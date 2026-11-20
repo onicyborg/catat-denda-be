@@ -138,7 +138,7 @@ jobs:
           )
           printf -v command 'bash -c %q -- %q %q %q %q %q %q' "$remote_script" "$GHCR_USERNAME" "$APP_DIR" "$IMAGE" "$ADMIN_IMAGE" "$BACKEND_DOMAIN" "$FRONTEND_ORIGIN"
           printf '%s' "$GHCR_TOKEN" | sshpass -e ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$command"
-          curl --fail --silent --show-error --retry 3 --max-time 20 "https://$BACKEND_DOMAIN/api/v1/health/live"
+          curl --fail --silent --show-error --retry 3 --retry-all-errors --max-time 20 "https://$BACKEND_DOMAIN/api/v1/health/live"
           echo "Backend deployed: https://$BACKEND_DOMAIN (image $IMAGE)" >> "$GITHUB_STEP_SUMMARY"
       - name: Clean SSH configuration
         if: always()

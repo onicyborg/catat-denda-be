@@ -14,8 +14,9 @@ FROM build AS admin
 USER node
 CMD ["pnpm", "prisma:deploy"]
 
-FROM build AS production-dependencies
-RUN pnpm prune --prod
+FROM base AS production-dependencies
+COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN pnpm install --prod --frozen-lockfile
 
 FROM base AS runtime
 ENV NODE_ENV=production
