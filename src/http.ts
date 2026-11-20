@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { Request, Response, NextFunction } from 'express';
+import { PageResult } from './pagination.js';
 import { map } from 'rxjs';
 @Catch()
 class Errors implements ExceptionFilter {
@@ -83,6 +84,8 @@ export function configure(app: INestApplication) {
   app.useGlobalFilters(new Errors());
   app.useGlobalInterceptors({
     intercept: (_context, next) =>
-      next.handle().pipe(map((data) => ({ data }))),
+      next
+        .handle()
+        .pipe(map((data) => (data instanceof PageResult ? data : { data }))),
   });
 }

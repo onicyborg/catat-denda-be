@@ -1,5 +1,6 @@
 import 'dotenv/config';
-import { randomBytes } from 'node:crypto';
+import { writeFileSync, unlinkSync } from 'node:fs';
+import { createHash, randomBytes } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import * as argon2 from 'argon2';
 import { NestFactory } from '@nestjs/core';
@@ -25,6 +26,40 @@ await db.user.create({
     passwordHash: await argon2.hash('QA-only-password-12345'),
   },
 });
+const masterToken = randomBytes(32).toString('hex');
+const master = await db.user.create({
+  data: {
+    username: 'master.browser',
+    passwordHash: await argon2.hash(randomBytes(32)),
+  },
+});
+await db.authSession.create({
+  data: {
+    userId: master.id,
+    tokenHash: createHash('sha256').update(masterToken).digest('hex'),
+    expiresAt: new Date(Date.now() + 3600000),
+  },
+});
+const stateFile = '/tmp/catat-denda-master-qa-session.json';
+writeFileSync(
+  stateFile,
+  JSON.stringify({
+    cookies: [
+      {
+        name: 'efms_session',
+        value: masterToken,
+        domain: 'localhost',
+        path: '/api/v1',
+        expires: Math.floor(Date.now() / 1000) + 3600,
+        httpOnly: true,
+        secure: false,
+        sameSite: 'Lax',
+      },
+    ],
+    origins: [],
+  }),
+  { mode: 0o600 },
+);
 await app.listen(3101, '127.0.0.1');
 let closing = false;
 for (const signal of ['SIGTERM', 'SIGINT'])
@@ -33,6 +68,7 @@ for (const signal of ['SIGTERM', 'SIGINT'])
     closing = true;
     await db.$executeRawUnsafe(`DROP SCHEMA "${schema}" CASCADE`);
     await app.close();
+    unlinkSync(stateFile);
     process.exit(0);
   });
 console.log('Browser QA API ready on127.0.0.1:3101');

@@ -132,7 +132,7 @@ try {
       const user = await db.user.findUniqueOrThrow({ where: { email } });
       const hold = db.$transaction(
         async (tx) => {
-          await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id}::uuid FOR UPDATE`;
+          await db.lockRow(tx, 'User', user.id);
           locked();
           await release;
         },

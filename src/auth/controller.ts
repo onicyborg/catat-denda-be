@@ -101,7 +101,7 @@ export class AuthController {
         this.config.getOrThrow<number>('SESSION_TTL_HOURS') * 3600000,
     );
     const session = await this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id}::uuid FOR UPDATE`;
+      await this.db.lockRow(tx, 'User', user.id);
       const current = await tx.user.findUniqueOrThrow({
         where: { id: user.id },
       });
@@ -160,7 +160,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${req.session!.userId}::uuid FOR UPDATE`;
+      await this.db.lockRow(tx, 'User', req.session!.userId);
       await tx.authSession.update({
         where: { id: req.session!.id },
         data: { revokedAt: new Date() },
@@ -206,7 +206,7 @@ export class AuthController {
       type: argon2.argon2id,
     });
     await this.db.$transaction(async (tx) => {
-      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id}::uuid FOR UPDATE`;
+      await this.db.lockRow(tx, 'User', user.id);
       const session = await tx.authSession.findUnique({
         where: { id: req.session!.id },
         include: { user: true },
