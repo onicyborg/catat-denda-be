@@ -3,7 +3,17 @@ import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { NestFactory } from '@nestjs/core';
-import request from 'supertest';
+import supertest from 'supertest';
+const request = (server) =>
+  Object.fromEntries(
+    ['get', 'post', 'patch', 'delete', 'head', 'options'].map((method) => [
+      method,
+      (path) =>
+        supertest(server)
+          [method](path)
+          .set('Host', new URL(process.env.APP_BASE_URL).host),
+    ]),
+  );
 import * as argon2 from 'argon2';
 
 import { configure } from '../dist/http.js';
@@ -14,7 +24,10 @@ const url = new URL(process.env.DATABASE_URL);
 url.searchParams.set('schema', schema);
 process.env.DATABASE_URL = url.toString();
 process.env.SESSION_SECRET = randomBytes(32).toString('hex');
-process.env.APP_BASE_URL = 'http://localhost:3000';
+process.env.APP_BASE_URL =
+  process.env.NODE_ENV === 'production'
+    ? 'https://qa.example.test'
+    : 'http://localhost:3000';
 execFileSync('pnpm', ['prisma:deploy'], { stdio: 'inherit', env: process.env });
 const { AppModule } = await import('../dist/app.module.js');
 const app = await NestFactory.create(AppModule, { logger: false });
@@ -60,6 +73,17 @@ try {
     data: { email, passwordHash: await argon2.hash(password) },
   });
   await request(http).get('/api/v1/health/live').expect(200);
+  if (process.env.NODE_ENV === 'production') {
+    await supertest(http)
+      .get('/api/v1/auth/me')
+      .set('Host', 'forged.example.test')
+      .set('X-Forwarded-Host', new URL(process.env.APP_BASE_URL).host)
+      .expect(403);
+    await supertest(http)
+      .get('/api/v1/health/live')
+      .set('Host', '127.0.0.1')
+      .expect(200);
+  }
   await request(http).get('/api/v1/auth/me').expect(401);
   await request(http)
     .post('/api/v1/auth/login')

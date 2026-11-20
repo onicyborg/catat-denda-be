@@ -1,0 +1,11 @@
+[Unit]
+Description=Twice-daily Catat Denda backup
+
+[Timer]
+OnCalendar=*-*-* 02,14:00:00 UTC
+AccuracySec=1s
+Persistent=true
+Unit=catat-denda-backup.service
+
+[Install]
+WantedBy=timers.target

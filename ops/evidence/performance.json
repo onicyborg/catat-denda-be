@@ -1,0 +1,62 @@
+{
+  "scope": "isolated local, compiled API in production mode; no external TLS/network latency",
+  "timestamp": "2026-11-20T14:14:31.136Z",
+  "node": "v24.14.1",
+  "postgres": "17.12",
+  "cpus": 20,
+  "memoryGiB": 15,
+  "cases": 10000,
+  "members": 40000,
+  "ledgerEntries": 20000,
+  "concurrentAdmins": 10,
+  "measurements": [
+    {
+      "route": "/fine-cases?limit=20",
+      "samples": 80,
+      "p50Ms": 52.41,
+      "p95Ms": 118.9,
+      "maxMs": 154.75,
+      "pass": true
+    },
+    {
+      "route": "/payments?limit=20",
+      "samples": 80,
+      "p50Ms": 62.29,
+      "p95Ms": 89.39,
+      "maxMs": 102,
+      "pass": true
+    },
+    {
+      "route": "/dashboard/summary?from=2026-01-01&to=2026-01-31",
+      "samples": 80,
+      "p50Ms": 459.73,
+      "p95Ms": 517.88,
+      "maxMs": 561.52,
+      "pass": true
+    },
+    {
+      "route": "/reports/summary?from=2026-01-01&to=2026-01-31",
+      "samples": 80,
+      "p50Ms": 121.93,
+      "p95Ms": 160.8,
+      "maxMs": 171.16,
+      "pass": true
+    },
+    {
+      "route": "/reports/employee-balances?from=2026-01-01&to=2026-01-31",
+      "samples": 80,
+      "p50Ms": 169.26,
+      "p95Ms": 229.12,
+      "maxMs": 243.18,
+      "pass": true
+    },
+    {
+      "route": "/audit-logs?limit=20",
+      "samples": 80,
+      "p50Ms": 47.82,
+      "p95Ms": 72.17,
+      "maxMs": 80.4,
+      "pass": true
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import type { Request, Response, NextFunction } from 'express';
 import { PageResult } from './pagination.js';
+import { ConfigService } from '@nestjs/config';
 import { map } from 'rxjs';
 @Catch()
 class Errors implements ExceptionFilter {
@@ -53,6 +54,13 @@ class Errors implements ExceptionFilter {
   }
 }
 export function configure(app: INestApplication) {
+  const express = app.getHttpAdapter().getInstance();
+  express.set(
+    'trust proxy',
+    app.get(ConfigService).get<boolean>('TRUST_PROXY_LOOPBACK')
+      ? 'loopback'
+      : false,
+  );
   app.setGlobalPrefix('api/v1');
   app.use(helmet());
   app.use(cookieParser());
@@ -63,6 +71,7 @@ export function configure(app: INestApplication) {
       next: NextFunction,
     ) => {
       req.requestId = randomUUID();
+      const started = process.hrtime.bigint();
       res.setHeader('X-Request-Id', req.requestId);
       res.setHeader('Cache-Control', 'no-store');
       res.on('finish', () =>
@@ -70,7 +79,15 @@ export function configure(app: INestApplication) {
           JSON.stringify({
             requestId: req.requestId,
             method: req.method,
+            route:
+              typeof req.route?.path === 'string'
+                ? req.route.path
+                : 'unmatched',
             status: res.statusCode,
+            durationMs:
+              Math.round(
+                (Number(process.hrtime.bigint() - started) / 1e6) * 100,
+              ) / 100,
             timestamp: new Date().toISOString(),
           }),
         ),

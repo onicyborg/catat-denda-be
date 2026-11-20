@@ -1,0 +1,35 @@
+{
+  "scope": "isolated local database rehearsal, not production recovery",
+  "timestamp": "2026-11-20T14:42:52.459Z",
+  "migrationDeployRuns": 2,
+  "migrationMs": 4086.3,
+  "sourceCounts": {
+    "_prisma_migrations": "5",
+    "User": "1",
+    "Employee": "1",
+    "ViolationType": "1",
+    "FineCase": "1",
+    "FineCaseMember": "1",
+    "PaymentEntry": "1",
+    "AuditLog": "7"
+  },
+  "encryptedBackupBytes": 36091,
+  "backupEncrypted": true,
+  "wrongKeyRejected": true,
+  "tamperedCiphertextRejected": true,
+  "unsafeKeyPermissionsRejected": true,
+  "nonemptyTargetRejected": true,
+  "restoreMs": 164.5,
+  "totalRecoveryMs": 8895.1,
+  "observedSnapshotAgeMs": 3160,
+  "rpoOperationalHoursTarget": 24,
+  "rtoOperationalHoursTarget": 24,
+  "retention": {
+    "removed": [
+      "catat-denda_20261017T144252Z_d9e8cd545617.dump.enc",
+      "catat-denda_20261016T144252Z_06a0700affd9.dump.enc"
+    ],
+    "retained": 14
+  },
+  "leastPrivilegeSmoke": true
+}

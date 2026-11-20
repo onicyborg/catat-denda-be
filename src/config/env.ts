@@ -10,6 +10,11 @@ export function validateEnv(config: Record<string, unknown>) {
           'DATABASE_URL harus PostgreSQL.',
         ),
       PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+      TRUST_PROXY_LOOPBACK: z.preprocess(
+        (value) =>
+          value === 'true' ? true : value === 'false' ? false : value,
+        z.boolean().default(false),
+      ),
       APP_BASE_URL: z
         .url()
         .refine((value) => {
@@ -32,6 +37,12 @@ export function validateEnv(config: Record<string, unknown>) {
       SESSION_TTL_HOURS: z.coerce.number().int().min(1).max(168).default(24),
       SESSION_SECRET: z.string().min(32),
     })
+    .refine(
+      (value) =>
+        value.NODE_ENV !== 'production' ||
+        new URL(value.APP_BASE_URL).protocol === 'https:',
+      'APP_BASE_URL wajib HTTPS pada production.',
+    )
     .refine(
       (value) =>
         value.NODE_ENV !== 'production' ||

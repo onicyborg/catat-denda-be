@@ -27,4 +27,27 @@ describe('Environment security boundaries', () => {
       }),
     ).toThrow();
   });
+  it('requires HTTPS in production and explicit loopback proxy trust', () => {
+    expect(() =>
+      validateEnv({
+        ...valid,
+        NODE_ENV: 'production',
+        APP_BASE_URL: 'http://localhost:3000',
+      }),
+    ).toThrow();
+    expect(
+      validateEnv({
+        ...valid,
+        NODE_ENV: 'production',
+        APP_BASE_URL: 'https://qa.example.test',
+      }).TRUST_PROXY_LOOPBACK,
+    ).toBe(false);
+    expect(
+      validateEnv({ ...valid, TRUST_PROXY_LOOPBACK: 'true' })
+        .TRUST_PROXY_LOOPBACK,
+    ).toBe(true);
+    expect(() =>
+      validateEnv({ ...valid, TRUST_PROXY_LOOPBACK: 'anything' }),
+    ).toThrow();
+  });
 });

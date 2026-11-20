@@ -1,0 +1,16 @@
+{
+  "httpsEdge": "PASS",
+  "redirect": true,
+  "privateNoStore": true,
+  "forgedHostRejected": true,
+  "originRejected": true,
+  "forgedForwardedIpCannotBypassThrottle": true,
+  "loginStatuses": [
+    401,
+    401,
+    401,
+    429,
+    429,
+    429
+  ]
+}

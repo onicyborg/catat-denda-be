@@ -1,0 +1,23 @@
+[Unit]
+Description=Encrypted Catat Denda PostgreSQL backup
+After=network-online.target
+Wants=network-online.target
+RequiresMountsFor=/mnt/catat-backups
+
+[Service]
+Type=oneshot
+User=catat-backup
+Group=catat-backup
+WorkingDirectory=/srv/catat-denda/backend/current
+EnvironmentFile=/etc/catat-denda/backup.env
+LoadCredential=backup.key:/etc/catat-denda/backup.key
+ExecStart=/usr/bin/node scripts/ops/backup.mjs --output /mnt/catat-backups --key-file %d/backup.key --prune
+TimeoutStartSec=1h
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/mnt/catat-backups
+StandardOutput=journal
+StandardError=journal

@@ -34,6 +34,17 @@ export class SessionGuard implements CanActivate {
   }
   async canActivate(context: ExecutionContext) {
     const req = context.switchToHttp().getRequest<AuthRequest>();
+    const internalLive =
+      ['GET', 'HEAD'].includes(req.method) &&
+      /^\/api\/v1\/health\/live\/?$/.test(req.path);
+    if (
+      this.config.get('NODE_ENV') === 'production' &&
+      !internalLive &&
+      req.headers.host !==
+        new URL(this.config.getOrThrow<string>('APP_BASE_URL')).host
+    ) {
+      throw new ForbiddenException('Host permintaan tidak diizinkan.');
+    }
 
     if (!['GET', 'HEAD', 'OPTIONS'].includes(req.method)) {
       if (
