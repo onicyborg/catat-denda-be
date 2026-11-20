@@ -49,19 +49,19 @@ pull_image() {
 }
 pull_image "$image"
 pull_image "$admin_image"
-docker run --rm --network host --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --dns 1.1.1.1 --dns 9.9.9.9 --dns-option timeout:2 --dns-option attempts:2 --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
   -v "$PWD:/run/deploy" -w /run/deploy "$admin_image" \
   node /app/deploy/prepare-env.mjs "$domain" "$origin"
 sed "s/__BACKEND_DOMAIN__/$domain/g" nginx.conf.template > "$nginx_file"
 nginx -t
-docker run --rm --network host --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --dns 1.1.1.1 --dns 9.9.9.9 --dns-option timeout:2 --dns-option attempts:2 --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin "$admin_image" pnpm prisma:deploy
-docker run --rm --network host --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --dns 1.1.1.1 --dns 9.9.9.9 --dns-option timeout:2 --dns-option attempts:2 --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin "$admin_image" pnpm db:seed
-docker run --rm --network host --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --dns 1.1.1.1 --dns 9.9.9.9 --dns-option timeout:2 --dns-option attempts:2 --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin -v "$PWD/.db-roles.json:/run/deploy/db-roles.json:ro" \
   "$admin_image" node deploy/provision-roles.mjs
-docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --dns 1.1.1.1 --dns 9.9.9.9 --dns-option timeout:2 --dns-option attempts:2 --read-only --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.runtime.next "$image" node --input-type=module -e '
   import pg from "pg";
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL });

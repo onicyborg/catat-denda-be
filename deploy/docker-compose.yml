@@ -3,6 +3,8 @@ services:
   api:
     image: ${IMAGE:?Set immutable image digest}
     network_mode: host
+    dns: [1.1.1.1, 9.9.9.9]
+    dns_opt: ["timeout:2", "attempts:2"]
     env_file: .env.runtime
     restart: unless-stopped
     init: true

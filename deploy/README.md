@@ -34,7 +34,7 @@ sehingga pengguna melalui gateway/proxy yang sama dapat berbagi kuota login.
 
 Image admin dan runtime terpisah; keduanya dikunci digest SHA-256. Unduhan dibatasi
 180 detik per percobaan dengan maksimal tiga percobaan. Job administrasi memakai
-jaringan host agar resolver lokal VPS tetap tersedia. Migrasi `deploy`
+jaringan host dengan resolver container 1.1.1.1/9.9.9.9 karena DNS default VPS kadang timeout. Konfigurasi DNS layanan lain tidak diubah. Migrasi `deploy`
 dan seed idempotent berjalan memakai owner direct; tidak ada reset database.
 Provisioning membuat role runtime dan backup terpisah. Runtime tidak mendapat hak DDL,
 penghapusan ledger, atau pengubahan audit. `.db-roles.json` harus disimpan privat dan
