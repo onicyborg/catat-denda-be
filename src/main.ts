@@ -1,12 +1,10 @@
 import { NestFactory } from '@nestjs/core';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module.js';
-
-async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
-  const config = app.get(ConfigService);
-  app.enableCors({ origin: config.getOrThrow<string>('WEB_ORIGIN') });
-  app.setGlobalPrefix('api');
-  await app.listen(config.getOrThrow<number>('PORT'));
-}
-await bootstrap();
+import { configure } from './http.js';
+const app = await NestFactory.create(AppModule);
+configure(app);
+await app.listen(
+  app.get(ConfigService).getOrThrow<number>('PORT'),
+  '127.0.0.1',
+);

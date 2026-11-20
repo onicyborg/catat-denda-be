@@ -7,4 +7,179 @@ datasource db {
   provider = "postgresql"
 }
 
-// Add domain models after the project brief is defined.
+enum Role {
+  ADMIN
+}
+
+enum CaseStatus {
+  DRAFT
+  POSTED
+  VOIDED
+}
+
+enum Category {
+  PREPARATION
+  SPILL
+  CLEANLINESS
+  INVENTORY_LOG
+  ORDER
+  OTHER
+}
+
+enum EntryKind {
+  PAYMENT
+  REVERSAL
+}
+
+enum Method {
+  CASH
+  TRANSFER
+  OTHER
+}
+
+model User {
+  id           String        @id @default(uuid()) @db.Uuid
+  email        String        @unique @db.VarChar(254)
+  passwordHash String
+  role         Role          @default(ADMIN)
+  isActive     Boolean       @default(true)
+  createdAt    DateTime      @default(now()) @db.Timestamptz
+  updatedAt    DateTime      @updatedAt @db.Timestamptz
+  lastLoginAt  DateTime?     @db.Timestamptz
+  sessions     AuthSession[]
+}
+
+model AuthSession {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  user       User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+  tokenHash  String    @unique
+  expiresAt  DateTime  @db.Timestamptz
+  revokedAt  DateTime? @db.Timestamptz
+  createdAt  DateTime  @default(now()) @db.Timestamptz
+  lastUsedAt DateTime? @db.Timestamptz
+}
+
+model Employee {
+  id             String           @id @default(uuid()) @db.Uuid
+  employeeCode   String?          @unique @db.VarChar(40)
+  displayName    String           @db.VarChar(120)
+  normalizedName String           @db.VarChar(120)
+  isActive       Boolean          @default(true)
+  createdAt      DateTime         @default(now()) @db.Timestamptz
+  updatedAt      DateTime         @updatedAt @db.Timestamptz
+  archivedAt     DateTime?        @db.Timestamptz
+  aliases        EmployeeAlias[]
+  members        FineCaseMember[]
+}
+
+model EmployeeAlias {
+  id              String   @id @default(uuid()) @db.Uuid
+  employeeId      String   @db.Uuid
+  employee        Employee @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  aliasDisplay    String   @db.VarChar(120)
+  aliasNormalized String   @unique @db.VarChar(120)
+}
+
+model ViolationType {
+  id                     String     @id @default(uuid()) @db.Uuid
+  code                   String     @unique @db.VarChar(40)
+  name                   String     @db.VarChar(120)
+  category               Category
+  description            String?
+  defaultAmountPerPerson Int
+  isActive               Boolean    @default(true)
+  createdAt              DateTime   @default(now()) @db.Timestamptz
+  updatedAt              DateTime   @updatedAt @db.Timestamptz
+  cases                  FineCase[]
+}
+
+model FineCase {
+  id                        String           @id @default(uuid()) @db.Uuid
+  caseNumber                Int              @unique @default(autoincrement())
+  occurredAt                DateTime?        @db.Timestamptz
+  violationTypeId           String?          @db.Uuid
+  violationType             ViolationType?   @relation(fields: [violationTypeId], references: [id], onDelete: Restrict)
+  violationCodeSnapshot     String?          @db.VarChar(40)
+  violationNameSnapshot     String?          @db.VarChar(120)
+  violationCategorySnapshot String?          @db.VarChar(40)
+  defaultRateSnapshot       Int?
+  description               String?
+  sourceText                String?
+  status                    CaseStatus       @default(DRAFT)
+  createdBy                 String           @db.Uuid
+  postedBy                  String?          @db.Uuid
+  voidedBy                  String?          @db.Uuid
+  postedAt                  DateTime?        @db.Timestamptz
+  voidedAt                  DateTime?        @db.Timestamptz
+  voidReason                String?
+  version                   Int              @default(1)
+  createdAt                 DateTime         @default(now()) @db.Timestamptz
+  updatedAt                 DateTime         @updatedAt @db.Timestamptz
+  members                   FineCaseMember[]
+
+  @@index([status, occurredAt(sort: Desc)])
+  @@index([violationTypeId, occurredAt])
+}
+
+model FineCaseMember {
+  id                   String         @id @default(uuid()) @db.Uuid
+  fineCaseId           String         @db.Uuid
+  fineCase             FineCase       @relation(fields: [fineCaseId], references: [id], onDelete: Restrict)
+  employeeId           String?        @db.Uuid
+  employee             Employee?      @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  employeeNameSnapshot String?        @db.VarChar(120)
+  rawEmployeeName      String?        @db.VarChar(120)
+  assignedAmount       Int?
+  createdAt            DateTime       @default(now()) @db.Timestamptz
+  updatedAt            DateTime       @updatedAt @db.Timestamptz
+  entries              PaymentEntry[]
+
+  @@unique([fineCaseId, employeeId])
+  @@index([employeeId, fineCaseId])
+}
+
+model PaymentEntry {
+  id                String         @id @default(uuid()) @db.Uuid
+  fineCaseMemberId  String         @db.Uuid
+  member            FineCaseMember @relation(fields: [fineCaseMemberId], references: [id], onDelete: Restrict)
+  kind              EntryKind
+  amount            Int
+  method            Method?
+  effectiveAt       DateTime       @db.Timestamptz
+  originalPaymentId String?        @unique @db.Uuid
+  original          PaymentEntry?  @relation("Reversal", fields: [originalPaymentId], references: [id], onDelete: Restrict)
+  reversal          PaymentEntry?  @relation("Reversal")
+  note              String?
+  idempotencyKey    String         @unique @db.Uuid
+  requestHash       String         @db.VarChar(64)
+  recordedBy        String         @db.Uuid
+  createdAt         DateTime       @default(now()) @db.Timestamptz
+
+  @@index([fineCaseMemberId, effectiveAt])
+}
+
+model AuditLog {
+  id          String   @id @default(uuid()) @db.Uuid
+  actorUserId String   @db.Uuid
+  action      String
+  entityType  String
+  entityId    String   @db.Uuid
+  beforeJson  Json?
+  afterJson   Json?
+  requestId   String?
+  createdAt   DateTime @default(now()) @db.Timestamptz
+
+  @@index([entityType, entityId, createdAt(sort: Desc)])
+  @@index([createdAt(sort: Desc)])
+}
+
+model AppSettings {
+  id                  Int      @id @default(1)
+  businessName        String   @db.VarChar(150)
+  currency            String   @default("IDR")
+  timezone            String   @default("Asia/Jakarta")
+  finePolicyReference String?
+  updatedAt           DateTime @updatedAt @db.Timestamptz
+  updatedBy           String   @db.Uuid
+}
