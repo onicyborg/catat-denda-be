@@ -113,3 +113,9 @@ Suite test:e2e kini menjalankan6 runner. verify-reporting.mjs menguji kasus4 mem
 Hasil checks serta batas validasi lokal tersedia di [ops/QA.md](ops/QA.md). Gunakan [runbook](ops/RUNBOOK.md) untuk provisioning role, frozen-lockfile release, nginx HTTPS, systemd, bootstrap, backup AES256GCM, restore ke DB baru, rotasi dan konflik transaksi. Semua template belum diaktifkan pada server produksi.
 
 `pnpm test:performance` memakai10k kasus/10admin pada schema QA. `pnpm test:recovery` membuat DB/role disposable untuk migrasi, backup/restore dan smoke least privilege. `pnpm test:https:server` menyalakan rehearsal HTTPS lokal dengan checkout frontend sibling yang sudah dibuild ke .next-release; jalankan `pnpm test:release` pada frontend dan `node scripts/verify-https-edge.mjs` terakhir, lalu Ctrl+C untuk cleanup. Lihat runbook dan laporan untuk prasyarat. Jangan gunakan runner QA dengan credential produksi.
+
+## Seeder inisiasi
+
+Setelah `pnpm prisma:generate` dan `pnpm prisma:deploy`, jalankan `pnpm db:seed` memakai DATABASE_URL owner/provisioning. Untuk database baru, supply SEED_ADMIN_PASSWORD melalui environment privat; username defyana dibuat sebagai ADMIN. Password tidak disimpan di source/Git dan akun yang sudah ada tidak direset. Job administrasi memerlukan dependencies tooling penuh, bukan instalasi runtime --prod.
+
+Seeder memuat11 karyawan dan18 kejadian sumber sebagai DRAFT dengan23 alokasi, total nominal diketahui105000,3 nominal null dan0 pembayaran. Semua tanggal dan jenis tetap kosong sampai admin meninjau lalu posting. Batch idempotent: aman dijalankan ulang tanpa menggandakan atau menimpa data yang sudah ditinjau. `pnpm test:seed` membangun API dan menguji seed pada schema disposable. Detail deployment, pembagian nominal, audit dan bukti tes tersedia di [ops/INITIAL-SEED.md](ops/INITIAL-SEED.md).

@@ -24,6 +24,8 @@ Script grant menyasar schema public. Runtime dapat menjalankan operasi aplikasi 
 
 ## Release manual
 
+Untuk deployment yang membawa18 kejadian awal yang diminta pemilik, ikuti [INITIAL-SEED.md](INITIAL-SEED.md): sesudah migration jalankan `pnpm db:seed` dengan role owner dan SEED_ADMIN_PASSWORD sementara. Seeder membuat defyana bila belum ada sehingga bootstrap terpisah tidak diperlukan. Ini data awal yang secara eksplisit diminta, bukan fixture QA; semua kejadian tetap DRAFT tanpa tanggal/jenis sampai ditinjau admin.
+
 1. Catat SHA main FE/BE dan hash OpenAPI yang cocok, hasil UAT, audit, browser, load test dan restore. Tetapkan maintenance window serta operator pemulihan. Tinjauan kebijakan denda, akses dan retensi data usaha disetujui pemilik. Tidak ada fixture bisnis atau credential development dibawa ke produksi.
 2. Di setiap checkout release, `pnpm install --frozen-lockfile`; BE `pnpm prisma:generate && pnpm build`; FE `API_INTERNAL_URL=http://127.0.0.1:3001 pnpm build`. Rewrites Next.js dibentuk saat build. Jangan memasang DATABASE_URL/secret di NEXT_PUBLIC_* atau bundle FE. Jalankan audit dan checks yang tercatat pada laporan QA.
 3. Backup database sebelum migrasi dan verifikasi bahwa archive+manifest serta kunci bisa dibaca dari storage terpisah. Rehearse migrasi terhadap restore nonprod dengan akun/secret nonprod. Jangan menyalakan aplikasi hasil restore yang masih mempunyai session produksi; cabut AuthSession pada salinan dan gunakan SESSION_SECRET baru.

@@ -29,6 +29,8 @@
     "admin:bootstrap": "tsx scripts/bootstrap-admin.ts",
     "openapi:export": "pnpm build && node scripts/export-openapi.mjs",
     "prisma:deploy": "prisma migrate deploy",
+    "db:seed": "prisma db seed",
+    "test:seed": "pnpm build && tsx scripts/verify-initial-seed.ts",
     "test:browser:server": "pnpm build && node scripts/serve-browser-qa.mjs",
     "test:performance": "pnpm build && node scripts/verify-performance.mjs",
     "test:recovery": "pnpm build && node scripts/verify-restore.mjs",
