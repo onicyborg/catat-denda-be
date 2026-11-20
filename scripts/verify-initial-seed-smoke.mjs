@@ -18,6 +18,23 @@ try {
     .send({ username: 'defyana', password: process.env.QA_ADMIN_PASSWORD })
     .expect(201);
   const cookie = login.headers['set-cookie'][0].split(';')[0];
+  const activeTypes = await request(server)
+    .get('/api/v1/violation-types')
+    .set('Cookie', cookie)
+    .expect(200);
+  const allTypes = await request(server)
+    .get('/api/v1/violation-types?status=ALL')
+    .set('Cookie', cookie)
+    .expect(200);
+  assert.equal(activeTypes.body.data.length, 4);
+  assert.equal(allTypes.body.data.length, 6);
+  assert(
+    allTypes.body.data
+      .filter((type) =>
+        ['SALAH-PESANAN', 'PERLU-KLASIFIKASI'].includes(type.code),
+      )
+      .every((type) => type.isActive === false),
+  );
   assert.match(login.headers['x-request-id'], /^[0-9a-f-]{14}7[0-9a-f-]{21}$/);
   await request(server)
     .get('/api/v1/fine-cases/' + process.env.QA_FINE_ID)

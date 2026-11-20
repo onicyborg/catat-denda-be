@@ -2,6 +2,11 @@ import { createHash } from 'node:crypto';
 import * as argon2 from 'argon2';
 import { Prisma, type PrismaClient } from '../src/generated/prisma/client.js';
 import { initialEmployees, initialIncidents } from './initial-data.js';
+import {
+  initialViolationTypes,
+  initialIncidentTypes,
+  type InitialViolationCode,
+} from './initial-violation-types.js';
 
 const batch = 'catat-denda:initial-2026:v1';
 const normalize = (name: string) =>
@@ -87,7 +92,76 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
             'Manifest seed berbeda dari batch yang sudah diterapkan.',
           );
       }
-      // A completed batch remains untouched even after employees/cases are edited.
+      if (initialIncidentTypes.length !== initialIncidents.length)
+        throw new Error('Pemetaan jenis awal tidak lengkap.');
+      const types = new Map<InitialViolationCode, string>();
+      let violationTypesCreated = 0;
+      for (const definition of initialViolationTypes) {
+        let type = await tx.violationType.findUnique({
+          where: { code: definition.code },
+        });
+        if (!type) {
+          type = await tx.violationType.create({
+            data: {
+              code: definition.code,
+              name: definition.name,
+              category: definition.category,
+              defaultAmountPerPerson: definition.defaultAmountPerPerson,
+              description: definition.description,
+              isActive: !definition.requiresReview,
+            },
+          });
+          violationTypesCreated++;
+          await audit('ViolationType', type.id, {
+            batch: 'initial-types:v1',
+            code: type.code,
+            name: type.name,
+            category: type.category,
+            defaultAmountPerPerson: type.defaultAmountPerPerson,
+            isActive: type.isActive,
+          });
+        }
+        types.set(definition.code, type.id);
+      }
+      let casesClassified = 0;
+      for (const marker of markers) {
+        const index = initialIncidents.findIndex(
+          (_, i) => seedKey(i) === marker.seedKey,
+        );
+        const before = await tx.fineCase.findUniqueOrThrow({
+          where: { id: marker.fineCaseId },
+        });
+        if (before.status !== 'DRAFT' || before.violationTypeId !== null)
+          continue;
+        const violationTypeId = types.get(initialIncidentTypes[index])!;
+        const changed = await tx.fineCase.updateMany({
+          where: {
+            id: before.id,
+            version: before.version,
+            status: 'DRAFT',
+            violationTypeId: null,
+          },
+          data: { violationTypeId, version: { increment: 1 } },
+        });
+        if (changed.count) {
+          casesClassified++;
+          await tx.auditLog.create({
+            data: {
+              actorUserId: actor,
+              action: 'INITIAL_TYPE_ASSIGNED',
+              entityType: 'FineCase',
+              entityId: before.id,
+              beforeJson: { violationTypeId: null, version: before.version },
+              afterJson: {
+                violationTypeId,
+                version: before.version + 1,
+                classificationBatch: 'initial-types:v1',
+              },
+            },
+          });
+        }
+      }
+      // Source rows are not recreated; only missing draft type references are filled above.
       if (markers.length === initialIncidents.length)
         return {
           adminUsername: 'defyana',
@@ -95,6 +169,8 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
           employeesCreated: 0,
           casesCreated: 0,
           casesSkipped: markers.length,
+          violationTypesCreated,
+          casesClassified,
           initialStatus: 'DRAFT',
         };
       let employeesCreated = 0;
@@ -147,7 +223,7 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
             description: incident.description,
             sourceText: incident.sourceText,
             occurredAt: null,
-            violationTypeId: null,
+            violationTypeId: types.get(initialIncidentTypes[index])!,
             status: 'DRAFT',
             createdBy: actor,
             members: {
@@ -170,6 +246,7 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
           status: 'DRAFT',
           sourceText: incident.sourceText,
           sourceTotal: incident.total,
+          violationTypeId: fine.violationTypeId,
           reviewRequired: true,
         });
         casesCreated++;
@@ -180,6 +257,8 @@ export async function seedInitialData(db: PrismaClient, password?: string) {
         employeesCreated,
         casesCreated,
         casesSkipped: initialIncidents.length - casesCreated,
+        violationTypesCreated,
+        casesClassified: casesClassified + casesCreated,
         initialStatus: 'DRAFT',
       };
     },

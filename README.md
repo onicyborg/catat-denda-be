@@ -123,3 +123,5 @@ Seeder memuat11 karyawan dan18 kejadian sumber sebagai DRAFT dengan23 alokasi, t
 ## UUIDv7
 
 Seluruh primary key entitas menggunakan UUIDv7, termasuk AppSettings dan FineCaseCreation. Singleton settings memakai singletonKey1; caseNumber tetap nomor bisnis. Seeder menggunakan marker batch teks untuk idempotensi dan membiarkan Prisma menghasilkan IDv7 baru. Request ID dan entity audit export juga UUIDv7. `pnpm test:uuid` memeriksa generated IDs, API/ledger, idempotensi seed dan upgrade schema lama. Detail reset lokal yang diminta dan bukti verifikasi di [ops/UUID-V7.md](ops/UUID-V7.md).
+
+Seeder juga membuat6 master jenis kesalahan dan menghubungkan18 kejadian awal. Empat jenis aktif; SALAH-PESANAN dan PERLU-KLASIFIKASI nonaktif sampai review pengelola. Pemetaan terpisah dari manifest sumber agar batch yang sudah ada dapat dilengkapi tanpa reset. `pnpm db:seed` mengisi jenis draft yang masih kosong, mempertahankan pilihan manual serta tarif/status master yang sudah diedit. Nominal/tanggal/status kasus tidak ditimpa. Rincian kode/pemetaan ada di ops/INITIAL-SEED.md.

@@ -6,6 +6,10 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 import { seedInitialData, seedKey } from '../prisma/seed-initial.js';
 import { initialIncidents } from '../prisma/initial-data.js';
+import {
+  initialIncidentTypes,
+  initialViolationTypes,
+} from '../prisma/initial-violation-types.js';
 import * as argon2 from 'argon2';
 import { version as uuidVersion } from 'uuid';
 
@@ -51,12 +55,17 @@ try {
   assert.equal(await db.fineCase.count(), 18);
   assert.equal(await db.fineCaseMember.count(), 23);
   assert.equal(await db.fineCaseCreation.count(), 18);
-  assert.equal(await db.violationType.count(), 0);
+  assert.equal(await db.violationType.count(), 6);
+  assert.equal(await db.violationType.count({ where: { isActive: true } }), 4);
   assert.equal(await db.paymentEntry.count(), 0);
   assert.equal(await db.fineCase.count({ where: { status: 'POSTED' } }), 0);
   assert.equal(
     await db.fineCase.count({
-      where: { occurredAt: null, violationTypeId: null, status: 'DRAFT' },
+      where: {
+        occurredAt: null,
+        violationTypeId: { not: null },
+        status: 'DRAFT',
+      },
     }),
     18,
   );
@@ -80,10 +89,14 @@ try {
   const employeeIds = new Map(
     (await db.employee.findMany()).map((e) => [e.normalizedName, e.id]),
   );
+  const typeIds = new Map(
+    (await db.violationType.findMany()).map((t) => [t.code, t.id]),
+  );
   for (const [index, incident] of initialIncidents.entries()) {
     const row = cases.find((c) => c.creation?.seedKey === seedKey(index))!;
     assert.equal(row.sourceText, incident.sourceText);
     assert.equal(row.description, incident.description);
+    assert.equal(row.violationTypeId, typeIds.get(initialIncidentTypes[index]));
     assert.equal(row.members.length, incident.employees.length);
     assert.equal(
       row.members.reduce((n, m) => n + (m.assignedAmount ?? 0), 0),
@@ -103,6 +116,36 @@ try {
   assert.notEqual(employeeIds.get('el'), employeeIds.get('elvina'));
   assert.notEqual(employeeIds.get('davin'), employeeIds.get('dhafin'));
   const edited = cases.find((c) => c.creation?.seedKey === seedKey(0))!.id;
+  // Upgrade a previously seeded database, preserving an administrator's chosen type.
+  const legacy = cases.find((c) => c.creation?.seedKey === seedKey(1))!;
+  await db.fineCase.update({
+    where: { id: legacy.id },
+    data: { violationTypeId: null },
+  });
+  await db.fineCase.update({
+    where: { id: edited },
+    data: { violationTypeId: typeIds.get('SALAH-RACIK')! },
+  });
+  const upgraded = await seedInitialData(db);
+  assert.equal(upgraded.casesClassified, 1);
+  assert.equal(
+    (await db.fineCase.findUniqueOrThrow({ where: { id: legacy.id } }))
+      .violationTypeId,
+    typeIds.get('CATAT-STOK'),
+  );
+  assert.equal(
+    (await db.fineCase.findUniqueOrThrow({ where: { id: edited } }))
+      .violationTypeId,
+    typeIds.get('SALAH-RACIK'),
+  );
+  const classificationAudit = await db.auditLog.findFirstOrThrow({
+    where: { entityId: legacy.id, action: 'INITIAL_TYPE_ASSIGNED' },
+  });
+  assert(classificationAudit.beforeJson && classificationAudit.afterJson);
+  await db.violationType.update({
+    where: { id: typeIds.get('SALAH-RACIK')! },
+    data: { name: 'Owner revised recipe', defaultAmountPerPerson: 7500 },
+  });
   await db.fineCase.update({
     where: { id: edited },
     data: { description: 'Edited by administrator', version: { increment: 1 } },
@@ -119,6 +162,17 @@ try {
   const again = await seedInitialData(db, randomBytes(20).toString('hex'));
   assert.equal(again.casesCreated, 0);
   assert.equal(again.employeesCreated, 0);
+  assert.equal(again.violationTypesCreated, 0);
+  assert.equal(again.casesClassified, 0);
+  assert.equal(
+    (
+      await db.violationType.findUniqueOrThrow({
+        where: { id: typeIds.get('SALAH-RACIK')! },
+      })
+    ).defaultAmountPerPerson,
+    7500,
+  );
+  assert.equal(await db.violationType.count(), initialViolationTypes.length);
   assert.equal(await db.auditLog.count(), audits);
   assert.equal(
     (await db.user.findUniqueOrThrow({ where: { id: admin.id } })).passwordHash,
