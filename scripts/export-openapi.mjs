@@ -6,6 +6,13 @@ import { AppModule } from '../dist/app.module.js';
 import { configure } from '../dist/http.js';
 const app = await NestFactory.create(AppModule);
 configure(app);
-const doc = SwaggerModule.createDocument(app, new DocumentBuilder().setTitle('EFMS API').setVersion('1').addCookieAuth('efms_session').build());
+const doc = SwaggerModule.createDocument(
+  app,
+  new DocumentBuilder()
+    .setTitle('EFMS API')
+    .setVersion('1')
+    .addCookieAuth('efms_session')
+    .build(),
+);
 writeFileSync('openapi.json', JSON.stringify(doc, null, 2));
 await app.close();

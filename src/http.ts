@@ -30,11 +30,13 @@ class Errors implements ExceptionFilter {
             ? { fields: detail.fields }
             : undefined,
         message:
-          status === 500
-            ? 'Terjadi gangguan server.'
-            : typeof detail === 'object' && detail && 'message' in detail
-              ? detail.message
-              : 'Permintaan ditolak.',
+          status === 429
+            ? 'Terlalu banyak permintaan. Coba lagi sebentar.'
+            : status === 500
+              ? 'Terjadi gangguan server.'
+              : typeof detail === 'object' && detail && 'message' in detail
+                ? detail.message
+                : 'Permintaan ditolak.',
       },
       requestId: req.requestId,
     });
@@ -83,5 +85,4 @@ export function configure(app: INestApplication) {
     intercept: (_context, next) =>
       next.handle().pipe(map((data) => ({ data }))),
   });
-  app.enableShutdownHooks();
 }

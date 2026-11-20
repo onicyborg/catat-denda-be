@@ -6,6 +6,7 @@ import {
   Req,
   Res,
   UnauthorizedException,
+  UnprocessableEntityException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -13,13 +14,16 @@ import {
   ApiTags,
   ApiOkResponse,
   ApiCreatedResponse,
+  ApiOperation,
+  ApiResponse,
+  ApiHeader,
 } from '@nestjs/swagger';
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { SessionGuard, hash, type AuthRequest } from './auth.js';
+import { SessionGuard, Public, hash, type AuthRequest } from './auth.js';
 import { AuditWriter } from '../audit.js';
 import { LoginDto, PasswordDto } from './dto.js';
 const dummyHash = argon2.hash(randomBytes(32), { type: argon2.argon2id });
@@ -58,6 +62,8 @@ export class AuthController {
     };
   }
   @ApiCreatedResponse({ schema: authEnvelope })
+  @Public()
+  @ApiOperation({ security: [] })
   @Post('login')
   @Throttle({ default: { limit: 5, ttl: 60000 } })
   async login(
@@ -117,11 +123,27 @@ export class AuthController {
     });
     return { ...user, csrfToken: this.guard.csrf(req.session!.id) };
   }
-  @Post('logout') async logout(
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: {
+          type: 'object',
+          required: ['success'],
+          properties: { success: { type: 'boolean' } },
+        },
+      },
+    },
+  })
+  @Post('logout')
+  async logout(
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${req.session!.userId}::uuid FOR UPDATE`;
       await tx.authSession.update({
         where: { id: req.session!.id },
         data: { revokedAt: new Date() },
@@ -137,19 +159,49 @@ export class AuthController {
     res.clearCookie('efms_session', this.cookie());
     return { success: true };
   }
-  @Post('change-password') async password(
-    @Body() body: PasswordDto,
-    @Req() req: AuthRequest,
-  ) {
+  @ApiHeader({ name: 'X-CSRF-Token', required: true })
+  @ApiResponse({ status: 401, description: 'Sesi tidak berlaku.' })
+  @ApiResponse({
+    status: 422,
+    description: 'Isian tidak valid atau kata sandi lama salah.',
+  })
+  @ApiCreatedResponse({
+    schema: {
+      type: 'object',
+      required: ['data'],
+      properties: {
+        data: {
+          type: 'object',
+          required: ['success'],
+          properties: { success: { type: 'boolean' } },
+        },
+      },
+    },
+  })
+  @Post('change-password')
+  async password(@Body() body: PasswordDto, @Req() req: AuthRequest) {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: req.session!.userId },
     });
     if (!(await argon2.verify(user.passwordHash, body.currentPassword)))
-      throw new UnauthorizedException('Kata sandi lama tidak sesuai.');
+      throw new UnprocessableEntityException('Kata sandi lama tidak sesuai.');
     const passwordHash = await argon2.hash(body.newPassword, {
       type: argon2.argon2id,
     });
     await this.db.$transaction(async (tx) => {
+      await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id}::uuid FOR UPDATE`;
+      const session = await tx.authSession.findUnique({
+        where: { id: req.session!.id },
+        include: { user: true },
+      });
+      if (
+        !session ||
+        session.revokedAt ||
+        session.expiresAt <= new Date() ||
+        !session.user.isActive
+      ) {
+        throw new UnauthorizedException('Sesi berakhir.');
+      }
       const result = await tx.user.updateMany({
         where: { id: user.id, passwordHash: user.passwordHash },
         data: { passwordHash },

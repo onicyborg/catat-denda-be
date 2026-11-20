@@ -6,12 +6,14 @@ import { validateEnv } from './config/env.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { PrismaService } from './prisma/prisma.service.js';
 import { AuditWriter } from './audit.js';
-import { SessionGuard } from './auth/auth.js';
+import { SessionGuard, Public } from './auth/auth.js';
 import { AuthController } from './auth/controller.js';
 @Controller('health')
 class HealthController {
   constructor(private db: PrismaService) {}
-  @Get('live') live() {
+  @Public()
+  @Get('live')
+  live() {
     return { status: 'ok' };
   }
   @Get('ready') async ready() {

@@ -34,3 +34,7 @@ E2E membuat schema PostgreSQL acak qa_* dalam DB konfigurasi dan menghapus schem
 OpenAPI tersimpan `openapi.json`; untuk frontend salin artifact ini lalu jalankan `pnpm api:generate` di repo FE. Hanya artifact kontrak yang dipertukarkan, bukan import source lintas repo. Snapshot fase dan hash kontrak dicatat pada docs/development-phases di folder induk.
 
 Migration harus versioned; `pnpm prisma:migrate --name <nama>` hanya development, `pnpm prisma:deploy` untuk deployment. Model minimum tersedia; fitur master/case/payment belum diekspos sampai fase masing-masing. Backup/restore dan production deployment dituntaskan Phase6. Kredensial Compose hanya lokal, DB port5433.
+
+Pengujian regresi Phase1 juga mencakup trailing slash/HEAD pada endpoint publik, JSON rusak, CSRF invalid tanpa perubahan sesi, dan pencabutan sesi saat request password sedang menunggu lock DB. Password lama yang salah mengembalikan422; sesi kedaluwarsa/revoked mengembalikan401. Environment menolak URL database non-PostgreSQL, origin dengan path/kredensial, dan placeholder SESSION_SECRET saat production.
+
+Untuk tes browser terintegrasi, jalankan `pnpm test:browser:server` dari backend, kemudian `pnpm test:e2e` dari frontend. Server QA memakai loopback3101 dan schema acak terisolasi, frontend QA port3100. Hentikan server dengan Ctrl+C setelah tes agar schema QA dihapus. Restart server QA sebelum mengulang suite agar akun dan rate-limit kembali baru. Akun di server ini khusus tes dan tidak dibuat pada schema operasional.
