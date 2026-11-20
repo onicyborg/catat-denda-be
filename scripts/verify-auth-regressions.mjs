@@ -42,6 +42,27 @@ try {
     .send({ email, password })
     .expect(201);
   const cookie = login.headers['set-cookie'][0].split(';')[0];
+  await db.user.create({
+    data: { username: 'qa.admin', passwordHash: await argon2.hash(password) },
+  });
+  await check('username-only admin and normalized username login', async () => {
+    const res = await request(http)
+      .post('/api/v1/auth/login')
+      .set('Origin', process.env.APP_BASE_URL)
+      .send({ username: ' QA.ADMIN ', password })
+      .expect(201);
+    assert.equal(res.body.data.username, 'qa.admin');
+    assert.equal(res.body.data.email, null);
+    const profile = await request(http)
+      .get('/api/v1/auth/me')
+      .set('Cookie', res.headers['set-cookie'][0].split(';')[0])
+      .expect(200);
+    assert.equal(profile.body.data.username, 'qa.admin');
+    await assert.rejects(
+      db.user.create({ data: { username: 'qa.admin', passwordHash: 'test' } }),
+    );
+  });
+
   const mutation = (path) =>
     request(http)
       .post(path)

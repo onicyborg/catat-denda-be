@@ -18,6 +18,7 @@ import {
   ApiResponse,
   ApiHeader,
 } from '@nestjs/swagger';
+import { isEmail } from 'class-validator';
 import { randomBytes } from 'node:crypto';
 import * as argon2 from 'argon2';
 import type { Response } from 'express';
@@ -33,10 +34,11 @@ const authEnvelope = {
   properties: {
     data: {
       type: 'object' as const,
-      required: ['id', 'email', 'csrfToken'],
+      required: ['id', 'username', 'email', 'csrfToken'],
       properties: {
         id: { type: 'string' as const },
-        email: { type: 'string' as const },
+        email: { type: 'string' as const, nullable: true },
+        username: { type: 'string' as const, nullable: true },
         role: { type: 'string' as const },
         csrfToken: { type: 'string' as const },
       },
@@ -71,14 +73,28 @@ export class AuthController {
     @Req() req: AuthRequest,
     @Res({ passthrough: true }) res: Response,
   ) {
+    if (Boolean(body.username) === Boolean(body.email)) {
+      throw new UnprocessableEntityException('Isi satu username atau email.');
+    }
+    const identifier = (body.username ?? body.email!).trim().toLowerCase();
+    const emailLogin = identifier.includes('@');
+    if (
+      emailLogin
+        ? !isEmail(identifier)
+        : !/^[a-z0-9][a-z0-9._-]{2,39}$/.test(identifier)
+    ) {
+      throw new UnprocessableEntityException(
+        'Username atau email tidak valid.',
+      );
+    }
     const user = await this.db.user.findUnique({
-      where: { email: body.email.trim().toLowerCase() },
+      where: emailLogin ? { email: identifier } : { username: identifier },
     });
     // Always perform password verification to avoid revealing whether an email exists.
     const encoded = user?.passwordHash ?? (await dummyHash);
     const valid = await argon2.verify(encoded, body.password);
     if (!user || !user.isActive || !valid)
-      throw new UnauthorizedException('Email atau kata sandi tidak sesuai.');
+      throw new UnauthorizedException('Username atau kata sandi tidak sesuai.');
     const token = randomBytes(32).toString('hex');
     const expiresAt = new Date(
       Date.now() +
@@ -111,6 +127,7 @@ export class AuthController {
     return {
       id: user.id,
       email: user.email,
+      username: user.username,
       csrfToken: this.guard.csrf(session.id),
     };
   }
@@ -119,7 +136,7 @@ export class AuthController {
   async me(@Req() req: AuthRequest) {
     const user = await this.db.user.findUniqueOrThrow({
       where: { id: req.session!.userId },
-      select: { id: true, email: true, role: true },
+      select: { id: true, username: true, email: true, role: true },
     });
     return { ...user, csrfToken: this.guard.csrf(req.session!.id) };
   }

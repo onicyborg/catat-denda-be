@@ -20,6 +20,7 @@ const db = app.get(PrismaService);
 // These credentials exist only in a disposable QA schema on loopback.
 await db.user.create({
   data: {
+    username: 'browser.admin',
     email: 'browser@example.test',
     passwordHash: await argon2.hash('QA-only-password-12345'),
   },

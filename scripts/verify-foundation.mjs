@@ -34,6 +34,7 @@ try {
   execFileSync('pnpm', ['admin:bootstrap'], {
     env: {
       ...process.env,
+      ADMIN_BOOTSTRAP_USERNAME: 'bootstrap.admin',
       ADMIN_BOOTSTRAP_EMAIL: 'bootstrap@example.test',
       ADMIN_BOOTSTRAP_PASSWORD: password,
     },
@@ -43,6 +44,7 @@ try {
     execFileSync('pnpm', ['admin:bootstrap'], {
       env: {
         ...process.env,
+        ADMIN_BOOTSTRAP_USERNAME: 'bootstrap.admin',
         ADMIN_BOOTSTRAP_EMAIL: 'bootstrap@example.test',
         ADMIN_BOOTSTRAP_PASSWORD: password + 'changed',
       },
@@ -53,6 +55,7 @@ try {
     where: { email: 'bootstrap@example.test' },
   });
   assert(await argon2.verify(bootstrap.passwordHash, password));
+  assert.equal(bootstrap.username, 'bootstrap.admin');
   const user = await db.user.create({
     data: { email, passwordHash: await argon2.hash(password) },
   });
