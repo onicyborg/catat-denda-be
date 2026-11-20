@@ -38,21 +38,29 @@ cleanup() {
   exit "$status"
 }
 trap cleanup EXIT
-docker pull "$image"
-docker pull "$admin_image"
-docker run --rm --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
+pull_image() {
+  for attempt in 1 2 3; do
+    if timeout --signal=TERM --kill-after=15s 180s docker pull "$1"; then return 0; fi
+    echo "Image download attempt $attempt failed or timed out; retrying." >&2
+    sleep 5
+  done
+  return 1
+}
+pull_image "$image"
+pull_image "$admin_image"
+docker run --rm --network host --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
   -v "$PWD:/run/deploy" -w /run/deploy "$admin_image" \
   node /app/deploy/prepare-env.mjs "$domain" "$origin"
 sed "s/__BACKEND_DOMAIN__/$domain/g" nginx.conf.template > "$nginx_file"
 nginx -t
-docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin "$admin_image" pnpm prisma:deploy
-docker run --rm --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin "$admin_image" pnpm db:seed
-docker run --rm --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --user 0:0 --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.admin -v "$PWD/.db-roles.json:/run/deploy/db-roles.json:ro" \
   "$admin_image" node deploy/provision-roles.mjs
-docker run --rm --read-only --cap-drop ALL --security-opt no-new-privileges \
+docker run --rm --network host --read-only --cap-drop ALL --security-opt no-new-privileges \
   --env-file .env.runtime.next "$image" node --input-type=module -e '
   import pg from "pg";
   const db = new pg.Client({ connectionString: process.env.DATABASE_URL });
