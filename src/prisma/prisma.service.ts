@@ -28,7 +28,8 @@ export class PrismaService extends PrismaClient implements OnModuleDestroy {
 
   async lockRow(
     tx: Prisma.TransactionClient,
-    table: 'User' | 'ViolationType',
+    table:
+      'User' | 'ViolationType' | 'Employee' | 'FineCase' | 'FineCaseMember',
     id: string,
   ) {
     const quote = (identifier: string) =>

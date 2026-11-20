@@ -96,27 +96,28 @@ model ViolationType {
 }
 
 model FineCase {
-  id                        String           @id @default(uuid()) @db.Uuid
-  caseNumber                Int              @unique @default(autoincrement())
-  occurredAt                DateTime?        @db.Timestamptz
-  violationTypeId           String?          @db.Uuid
-  violationType             ViolationType?   @relation(fields: [violationTypeId], references: [id], onDelete: Restrict)
-  violationCodeSnapshot     String?          @db.VarChar(40)
-  violationNameSnapshot     String?          @db.VarChar(120)
-  violationCategorySnapshot String?          @db.VarChar(40)
+  creation                  FineCaseCreation?
+  id                        String            @id @default(uuid()) @db.Uuid
+  caseNumber                Int               @unique @default(autoincrement())
+  occurredAt                DateTime?         @db.Timestamptz
+  violationTypeId           String?           @db.Uuid
+  violationType             ViolationType?    @relation(fields: [violationTypeId], references: [id], onDelete: Restrict)
+  violationCodeSnapshot     String?           @db.VarChar(40)
+  violationNameSnapshot     String?           @db.VarChar(120)
+  violationCategorySnapshot String?           @db.VarChar(40)
   defaultRateSnapshot       Int?
   description               String?
   sourceText                String?
-  status                    CaseStatus       @default(DRAFT)
-  createdBy                 String           @db.Uuid
-  postedBy                  String?          @db.Uuid
-  voidedBy                  String?          @db.Uuid
-  postedAt                  DateTime?        @db.Timestamptz
-  voidedAt                  DateTime?        @db.Timestamptz
+  status                    CaseStatus        @default(DRAFT)
+  createdBy                 String            @db.Uuid
+  postedBy                  String?           @db.Uuid
+  voidedBy                  String?           @db.Uuid
+  postedAt                  DateTime?         @db.Timestamptz
+  voidedAt                  DateTime?         @db.Timestamptz
   voidReason                String?
-  version                   Int              @default(1)
-  createdAt                 DateTime         @default(now()) @db.Timestamptz
-  updatedAt                 DateTime         @updatedAt @db.Timestamptz
+  version                   Int               @default(1)
+  createdAt                 DateTime          @default(now()) @db.Timestamptz
+  updatedAt                 DateTime          @updatedAt @db.Timestamptz
   members                   FineCaseMember[]
 
   @@index([status, occurredAt(sort: Desc)])
@@ -183,4 +184,13 @@ model AppSettings {
   finePolicyReference String?
   updatedAt           DateTime @updatedAt @db.Timestamptz
   updatedBy           String   @db.Uuid
+}
+
+model FineCaseCreation {
+  key         String   @id @db.Uuid
+  actorUserId String   @db.Uuid
+  fineCaseId  String   @unique @db.Uuid
+  fineCase    FineCase @relation(fields: [fineCaseId], references: [id], onDelete: Restrict)
+  requestHash String   @db.VarChar(64)
+  createdAt   DateTime @default(now()) @db.Timestamptz
 }

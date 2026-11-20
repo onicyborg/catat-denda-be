@@ -1,4 +1,5 @@
 import { Module, Controller, Get } from '@nestjs/common';
+import { FinesModule } from './fines/module.js';
 import { MasterModule } from './master/master.module.js';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD } from '@nestjs/core';
@@ -27,6 +28,7 @@ class HealthController {
     ConfigModule.forRoot({ isGlobal: true, validate: validateEnv }),
     PrismaModule,
     MasterModule,
+    FinesModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
   ],
   controllers: [AuthController, HealthController],
