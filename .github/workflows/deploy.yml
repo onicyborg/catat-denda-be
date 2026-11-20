@@ -1,0 +1,145 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [main, development]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: catat_denda_ci
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d catat_denda_ci"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/catat_denda_ci
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.14.1
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm prisma:generate
+      - run: pnpm lint && pnpm typecheck && pnpm test
+      - run: node --test deploy/prepare-env.test.mjs && bash -n deploy/deploy.sh
+      - run: pnpm test:e2e
+      - run: pnpm test:uuid
+
+  build-and-deploy:
+    if: github.ref == 'refs/heads/development'
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    environment:
+      name: development
+      url: https://api-catat-denda-berkop.geats.web.id/api/v1/health/live
+    permissions:
+      contents: read
+      packages: write
+    env:
+      IMAGE_NAME: ghcr.io/onicyborg/catat-denda-be
+      ADMIN_IMAGE_NAME: ghcr.io/onicyborg/catat-denda-be-admin
+      VPS_HOST: ${{ secrets.VPS_HOST }}
+      VPS_PORT: ${{ secrets.VPS_PORT || '4238' }}
+      VPS_USER: ${{ secrets.VPS_USER }}
+      VPS_ENV: ${{ secrets.VPS_ENV }}
+      VPS_SSH_PASSWORD: ${{ secrets.VPS_SSH_PASSWORD }}
+      VPS_KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+      APP_DIR: ${{ vars.VPS_API_APP_DIR || '/srv/catat-denda/backend' }}
+      BACKEND_DOMAIN: ${{ vars.BACKEND_DOMAIN || 'api-catat-denda-berkop.geats.web.id' }}
+      FRONTEND_ORIGIN: ${{ vars.FRONTEND_ORIGIN || 'https://catat-denda-berkop.geats.web.id' }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Validate deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for key in VPS_HOST VPS_USER VPS_ENV VPS_SSH_PASSWORD VPS_KNOWN_HOSTS; do
+            if [ -z "${!key}" ]; then echo "::error::Missing development secret $key"; exit 1; fi
+          done
+          [[ "$APP_DIR" =~ ^/[a-zA-Z0-9/_-]+$ ]]
+          [[ "$BACKEND_DOMAIN" =~ ^[a-z0-9.-]+$ ]]
+          [[ "$VPS_PORT" =~ ^[0-9]+$ ]]
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build administration image
+        id: admin
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: admin
+          push: true
+          tags: ${{ env.ADMIN_IMAGE_NAME }}:${{ github.sha }}
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Build runtime image
+        id: image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          target: runtime
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:development
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,mode=max,scope=backend
+      - name: Configure pinned SSH connection
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq sshpass
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_KNOWN_HOSTS" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+      - name: Deploy immutable images
+        env:
+          IMAGE: ${{ env.IMAGE_NAME }}@${{ steps.image.outputs.digest }}
+          ADMIN_IMAGE: ${{ env.ADMIN_IMAGE_NAME }}@${{ steps.admin.outputs.digest }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          export SSHPASS="$VPS_SSH_PASSWORD"
+          ssh_opts=(-o StrictHostKeyChecking=yes -o ConnectTimeout=20 -o NumberOfPasswordPrompts=1)
+          sshpass -e ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "install -d -m 700 '$APP_DIR'"
+          sshpass -e scp "${ssh_opts[@]}" -P "$VPS_PORT" deploy/docker-compose.yml deploy/deploy.sh deploy/nginx.conf.template "$VPS_USER@$VPS_HOST:$APP_DIR/"
+          printf '%s\n' "$VPS_ENV" | sshpass -e ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "umask 077; cat > '$APP_DIR/.env.next'"
+          remote_script=$(cat <<'REMOTE'
+          set -euo pipefail
+          credentials=$(mktemp -d)
+          export DOCKER_CONFIG="$credentials"
+          trap 'rm -rf "$credentials"' EXIT
+          docker login ghcr.io -u "$1" --password-stdin
+          bash "$2/deploy.sh" "$3" "$4" "$5" "$6"
+          REMOTE
+          )
+          printf -v command 'bash -c %q -- %q %q %q %q %q %q' "$remote_script" "$GHCR_USERNAME" "$APP_DIR" "$IMAGE" "$ADMIN_IMAGE" "$BACKEND_DOMAIN" "$FRONTEND_ORIGIN"
+          printf '%s' "$GHCR_TOKEN" | sshpass -e ssh "${ssh_opts[@]}" -p "$VPS_PORT" "$VPS_USER@$VPS_HOST" "$command"
+          curl --fail --silent --show-error --retry 3 --max-time 20 "https://$BACKEND_DOMAIN/api/v1/health/live"
+          echo "Backend deployed: https://$BACKEND_DOMAIN (image $IMAGE)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Clean SSH configuration
+        if: always()
+        run: rm -f ~/.ssh/known_hosts

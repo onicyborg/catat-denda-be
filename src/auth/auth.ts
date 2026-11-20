@@ -41,7 +41,10 @@ export class SessionGuard implements CanActivate {
       this.config.get('NODE_ENV') === 'production' &&
       !internalLive &&
       req.headers.host !==
-        new URL(this.config.getOrThrow<string>('APP_BASE_URL')).host
+        new URL(
+          this.config.get<string>('API_PUBLIC_URL') ??
+            this.config.getOrThrow<string>('APP_BASE_URL'),
+        ).host
     ) {
       throw new ForbiddenException('Host permintaan tidak diizinkan.');
     }

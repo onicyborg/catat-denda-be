@@ -10,6 +10,20 @@ export function validateEnv(config: Record<string, unknown>) {
           'DATABASE_URL harus PostgreSQL.',
         ),
       PORT: z.coerce.number().int().min(1).max(65535).default(3001),
+      API_PUBLIC_URL: z
+        .url()
+        .refine((value) => {
+          const url = new URL(value);
+          return (
+            url.protocol === 'https:' &&
+            !url.username &&
+            !url.password &&
+            url.pathname === '/' &&
+            !url.search &&
+            !url.hash
+          );
+        }, 'API_PUBLIC_URL harus origin HTTPS tanpa path atau kredensial.')
+        .optional(),
       TRUST_PROXY_LOOPBACK: z.preprocess(
         (value) =>
           value === 'true' ? true : value === 'false' ? false : value,

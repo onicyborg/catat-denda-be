@@ -4,6 +4,20 @@ const valid = {
   SESSION_SECRET: 'test-only-secret-at-least-32-characters',
 };
 describe('Environment security boundaries', () => {
+  it('validates the optional public API origin', () => {
+    for (const API_PUBLIC_URL of [
+      'http://api.test',
+      'https://api.test/path',
+      'https://user:pass@api.test',
+      'https://api.test?x=1',
+    ]) {
+      expect(() => validateEnv({ ...valid, API_PUBLIC_URL })).toThrow();
+    }
+    expect(
+      validateEnv({ ...valid, API_PUBLIC_URL: 'https://api.test' })
+        .API_PUBLIC_URL,
+    ).toBe('https://api.test');
+  });
   it('requires PostgreSQL and a plain HTTP origin', () => {
     expect(() =>
       validateEnv({ ...valid, DATABASE_URL: 'https://localhost/test' }),
