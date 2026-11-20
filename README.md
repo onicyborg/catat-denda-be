@@ -33,7 +33,7 @@ E2E membuat schema PostgreSQL acak qa_* dalam DB konfigurasi dan menghapus schem
 
 OpenAPI tersimpan `openapi.json`; untuk frontend salin artifact ini lalu jalankan `pnpm api:generate` di repo FE. Hanya artifact kontrak yang dipertukarkan, bukan import source lintas repo. Snapshot fase dan hash kontrak dicatat pada docs/development-phases di folder induk.
 
-Migration harus versioned; `pnpm prisma:migrate --name <nama>` hanya development, `pnpm prisma:deploy` untuk deployment. Model minimum tersedia; fitur master/case/payment belum diekspos sampai fase masing-masing. Backup/restore dan production deployment dituntaskan Phase6. Kredensial Compose hanya lokal, DB port5433.
+Migration harus versioned; `pnpm prisma:migrate --name <nama>` hanya development, `pnpm prisma:deploy` untuk deployment. Endpoint master, kejadian dan pembayaran tersedia setelah Phase1–4; laporan dan audit viewer mengikuti Phase5. Backup/restore dan production deployment dituntaskan Phase6. Kredensial Compose hanya lokal, DB port5433.
 
 Pengujian regresi Phase1 juga mencakup trailing slash/HEAD pada endpoint publik, JSON rusak, CSRF invalid tanpa perubahan sesi, dan pencabutan sesi saat request password sedang menunggu lock DB. Password lama yang salah mengembalikan422; sesi kedaluwarsa/revoked mengembalikan401. Environment menolak URL database non-PostgreSQL, origin dengan path/kredensial, dan placeholder SESSION_SECRET saat production.
 
@@ -68,3 +68,22 @@ Protokol lock untuk Phase4: transaksi selalu mengunci FineCase dulu, kemudian Fi
 List menerima q, status DRAFT/POSTED/VOIDED, employeeId, violationTypeId, from/to tanggal WIB, page dan limit. Batas akhir tanggal inklusif dalam WIB, diterjemahkan menjadi interval UTC setengah terbuka. Default semua status; sort createdAt/id desc, count+rows RepeatableRead. Ledger pada response detail bersifat readonly dan hanya berisi field tampilan, tanpa requestHash/idempotency key.
 
 Suite `pnpm test:e2e` menyertakan verify-fine-cases.mjs: posting nyata, snapshot, koreksi, validasi, replay/concurrency dan rollback audit. Helper scripts/fixtures-fines.mjs hanya dipakai runner QA pada schema acak. Untuk memverifikasi file contoh lokal tanpa menyalin data bisnis ke repo: `FINE_QA_SAMPLE_FILE=/path/05_SAMPLE_MIGRATION_CASES.json node scripts/verify-fine-cases.mjs` sesudah build. Seluruh18 kasus dimulai DRAFT dengan tanggal/ID kosong. Tanggal, mapping identitas dan jenis pada langkah konfirmasi tes adalah input sintetis eksplisit;15 kasus bernominal dikonfirmasi sehingga total105.000, tiga tanpa nominal tetap draft. Tidak ada import UI/seed operasional atau pembayaran otomatis.
+
+## Phase4: pembayaran dan pembalikan
+
+API privat:
+
+- `POST /fine-members/:id/payments` menerima amount integer1..100000000 dan <=sisa, method CASH/TRANSFER/OTHER, effectiveAt RFC3339 maksimal sekarang+5menit, note opsional maksimal1.000 karakter.
+- `POST /payments/:id/reverse` menerima reason5–500 dan effectiveAt >=pembayaran asli serta <=sekarang. Nominal/member/referensi berasal dari pembayaran asli, bukan input client. Pembalikan penuh satu kali; tidak dapat membalik REVERSAL atau case DRAFT/VOIDED.
+- `GET /payments` memakai filter from/to tanggal efektif WIB, employeeId, caseId, kind PAYMENT/REVERSAL, page/limit. Sort effectiveAt/createdAt/id desc, count+rows RepeatableRead; index global ditambah migration004.
+- `GET /payments/:id` mengembalikan field ledger immutable, aktor, snapshot peserta/kode kejadian, referensi pembayaran/pembalikan dan izin aksi terkini. Tidak ada PATCH/DELETE ledger atau pengubahan settlement manual.
+
+Kedua mutation memerlukan Origin, CSRF dan UUID Idempotency-Key. Satu namespace key mencakup PAYMENT/REVERSAL beserta target; canonical hash memasukkan operasi, target UUID lowercase, nominal/metode/tanggal ISO ternormalisasi dan catatan/alasan trim. Key sama+actor/payload sama memulihkan entry yang sama, termasuk setelah case dibatalkan; perbedaan actor/target/operasi/payload409. Ledger menyimpan key/hash permanen dan tidak mengeluarkannya melalui response. Field izin/referensi terkait pada receipt mencerminkan kondisi saat dibaca; identitas dan nilai transaksi asal tetap sama.
+
+Setiap transaksi mengambil advisory lock key lalu lock FineCase→FineCaseMember, membaca ulang lifecycle/saldo dan menulis ledger+version case+audit atomik. Master yang kemudian diarsipkan tetap dapat menerima pembayaran untuk alokasi historis POSTED. Audit gagal membatalkan ledger dan increment version. Pembayaran aktif menghalangi void; setelah reversal penuh void boleh, sementara koreksi finansial tetap terkunci karena pernah ada ledger.
+
+Lock timeout1.500ms, transaction timeout10detik/maxWait5detik dan maksimal3 percobaan untuk konflik/timeout transaksi P2034/P2028 atau SQLSTATE40001/40P01/55P03. Bila habis,409 dengan `error.details.retryable=true`; ulangi key/payload yang sama. Error bisnis409 dan validasi422 bukan instruksi membuat transaksi pengganti secara otomatis. Unknown failure tetap500 tanpa detail internal. FE mempertahankan key/payload saat koneksi/5xx/429/retryable409 belum pasti; error definitif4xx membolehkan koreksi input. Respons berhasil selalu diikuti refresh saldo backend.
+
+[Idempotency bawaan Nest](https://docs.nestjs.com/reliability/idempotency) ditinjau sebelum implementasi. Untuk ledger ini deduplikasi menggunakan unique key pada PaymentEntry dalam transaksi bisnis yang sama dengan uang dan audit, sehingga tidak memerlukan store/cache terpisah atau dependency baru. Ini juga mempertahankan kontrak409 dan retensi permanen yang dipilih proyek.
+
+`pnpm test:e2e` menyertakan verify-payments.mjs pada schema acak: pembayaran2k+3k, overpayment, replay lintas operasi/target/actor, dua pembayaran/reversal, VOID/PATCH bersamaan dengan PAYMENT, lock timeout PostgreSQL nyata dan audit rollback. Ringkasan per-karyawan diverifikasi terhadap member/case pada DB QA; endpoint/UI summary employee dan dashboard agregat menjadi Phase5. Runner browser QA tetap khusus port3101, tanpa seed bisnis/ledger pada schema operasional.

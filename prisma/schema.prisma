@@ -159,6 +159,7 @@ model PaymentEntry {
   createdAt         DateTime       @default(now()) @db.Timestamptz
 
   @@index([fineCaseMemberId, effectiveAt])
+  @@index([effectiveAt(sort: Desc), createdAt(sort: Desc), id(sort: Desc)])
 }
 
 model AuditLog {

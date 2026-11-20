@@ -27,8 +27,16 @@ class Errors implements ExceptionFilter {
       error: {
         code: `HTTP_${status}`,
         details:
-          typeof detail === 'object' && detail && 'fields' in detail
-            ? { fields: detail.fields }
+          typeof detail === 'object' &&
+          detail &&
+          ('fields' in detail || 'retryable' in detail)
+            ? {
+                fields: 'fields' in detail ? detail.fields : undefined,
+                retryable:
+                  'retryable' in detail && detail.retryable === true
+                    ? true
+                    : undefined,
+              }
             : undefined,
         message:
           status === 429

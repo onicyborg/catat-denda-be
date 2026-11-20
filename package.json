@@ -21,7 +21,7 @@
     "test:watch": "vitest",
     "test:cov": "vitest run --coverage",
     "test:debug": "vitest --inspect-brk --no-file-parallelism",
-    "test:e2e": "pnpm build && node scripts/verify-foundation.mjs && node scripts/verify-auth-regressions.mjs && node scripts/verify-master-data.mjs && node scripts/verify-fine-cases.mjs",
+    "test:e2e": "pnpm build && node scripts/verify-foundation.mjs && node scripts/verify-auth-regressions.mjs && node scripts/verify-master-data.mjs && node scripts/verify-fine-cases.mjs && node scripts/verify-payments.mjs",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "db:up": "docker compose up -d db",

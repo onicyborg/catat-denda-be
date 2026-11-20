@@ -1,3 +1,4 @@
+import { PaymentsModule } from './payments/module.js';
 import { Module, Controller, Get } from '@nestjs/common';
 import { FinesModule } from './fines/module.js';
 import { MasterModule } from './master/master.module.js';
@@ -29,6 +30,7 @@ class HealthController {
     PrismaModule,
     MasterModule,
     FinesModule,
+    PaymentsModule,
     ThrottlerModule.forRoot([{ ttl: 60000, limit: 120 }]),
   ],
   controllers: [AuthController, HealthController],
